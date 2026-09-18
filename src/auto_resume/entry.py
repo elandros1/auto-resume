@@ -277,25 +277,36 @@ def preview(
                     console.print(f"  [red]✗[/red] {label}")
 
     tpl_path = Path(template_path)
-    matches = detector.detect_fields(tpl_path, data)
+    previews = detector.preview_mapping(tpl_path)
+
+    if not previews:
+        console.print("[yellow]未检测到可自动识别的字段[/yellow]")
+        console.print("[dim]提示: 确保模板中使用中文标签（如姓名、电话等）[/dim]")
+        return
 
     console.print(f"\n[cyan]模板: {tpl_path.name}[/cyan]")
-    console.print(f"共 {len(matches)} 个字段:\n")
+    console.print(f"共 {len(previews)} 个字段:\n")
 
     table = RichTable(show_header=True, header_style="bold blue")
     table.add_column("标签", style="cyan")
-    table.add_column("匹配字段", style="green")
-    table.add_column("分数")
-    table.add_column("方法")
+    table.add_column("映射字段", style="green")
+    table.add_column("当前值", style="yellow")
+    table.add_column("方法", style="magenta")
+    table.add_column("位置", style="dim")
 
-    for m in matches:
-        score_str = f"{m['score']:.0%}" if m["score"] > 0 else "—"
-        table.add_row(m["label"], m["key"] or "[red]未匹配[/red]", score_str, m["method"])
+    for p in previews:
+        value = data.get(p["resume_key"], "")
+        if len(value) > 30:
+            value = value[:30] + "..."
+        table.add_row(
+            p["label"], p["resume_key"], value or "[空]",
+            p.get("method", ""), p.get("location", ""),
+        )
 
     console.print(table)
 
-    matched_count = sum(1 for m in matches if m["key"])
-    console.print(f"\n[green]已匹配: {matched_count}/{len(matches)}[/green]")
+    matched_count = sum(1 for p in previews if data.get(p["resume_key"]))
+    console.print(f"\n[green]已匹配: {matched_count}/{len(previews)}[/green]")
 
 
 @cli.command()

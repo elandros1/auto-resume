@@ -21,7 +21,7 @@ console = Console()
 
 
 @click.group()
-@click.version_option("1.0.0", prog_name="auto-resume")
+@click.version_option("1.4.1", prog_name="auto-resume")
 def cli():
     """Auto-Resume: 自动填写简历/表格到 Word 文档
 

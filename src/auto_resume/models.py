@@ -681,3 +681,139 @@ class ResumeData:
     def to_dict(self) -> dict[str, Any]:
         """Convert to a serializable dictionary."""
         return asdict(self)
+
+    def to_json(self, path: str | Path) -> None:
+        """Save resume data to a JSON file."""
+        path = Path(path)
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(self.to_dict(), f, ensure_ascii=False, indent=2)
+
+    @classmethod
+    def sample(cls) -> ResumeData:
+        """Create a sample ResumeData with example data for template generation."""
+        data = {
+            "name": "张三",
+            "gender": "男",
+            "birth_date": "1995-06",
+            "age": "29",
+            "phone": "13800138000",
+            "email": "zhangsan@example.com",
+            "address": "北京市海淀区中关村大街1号",
+            "postal_code": "100080",
+            "hometown": "浙江杭州",
+            "hukou_location": "浙江省杭州市",
+            "political_status": "中共党员",
+            "id_number": "3301**********1234",
+            "nationality": "汉",
+            "marital_status": "未婚",
+            "height": "175cm",
+            "vision": "5.0/5.0",
+            "specialty": "人工智能与机器学习，擅长自然语言处理和大模型训练",
+            "computer_proficiency": "熟练使用Python、Java、C++，精通PyTorch、TensorFlow框架",
+            "foreign_language": "英语（CET-6，流利，可作为工作语言）",
+            "previous_employer": "清华大学计算机系",
+            "current_position": "助理研究员",
+            "professional_title": "助理研究员（中级职称）",
+            "social_experience": "2020-2021年担任研究生会学术部部长",
+            "job_intent": "高校教师",
+            "applied_position": "计算机科学与技术 讲师/副教授",
+            "expected_position": "计算机科学与技术 讲师/副教授",
+            "expected_salary": "面议",
+            "expected_city": "北京",
+            "availability": "随时到岗",
+            "self_evaluation": "博士毕业于985高校，发表SCI论文5篇，主持省级科研项目1项。",
+            "emergency_contact": "李紧急",
+            "emergency_contact_phone": "13900001111",
+            "emergency_contact_relationship": "妻子",
+            "highest_degree": "博士研究生",
+            "graduation_date": "2024.06",
+            "education_duration": "五年",
+            "birthplace": "浙江杭州",
+            "applied_college": "计算机学院",
+            "professional_certificate": "高校教师资格证",
+            "is_fresh_graduate": "否",
+            "childbearing_status": "无",
+            "education": [
+                {
+                    "school": "浙江大学",
+                    "major": "计算机科学与技术",
+                    "degree": "博士",
+                    "start_date": "2019.09",
+                    "end_date": "2024.06",
+                    "gpa": "3.8/4.0",
+                    "description": "研究方向：人工智能与机器学习",
+                    "education_level": "博士研究生",
+                    "education_form": "全日制",
+                    "reference_person": "李教授",
+                    "reference_phone": "0571-12345678",
+                },
+                {
+                    "school": "浙江大学",
+                    "major": "计算机科学与技术",
+                    "degree": "学士",
+                    "start_date": "2015.09",
+                    "end_date": "2019.06",
+                    "gpa": "3.9/4.0",
+                    "education_level": "本科",
+                    "education_form": "全日制",
+                    "reference_person": "王教授",
+                    "reference_phone": "0571-87654321",
+                },
+            ],
+            "work_experience": [
+                {
+                    "company": "清华大学计算机系",
+                    "position": "助理研究员",
+                    "start_date": "2024.07",
+                    "end_date": "至今",
+                    "department": "人工智能研究所",
+                    "description": "从事大模型训练优化研究",
+                    "reference_person": "张院士",
+                    "reference_phone": "010-12345678",
+                    "professional_title": "助理研究员",
+                },
+            ],
+            "projects": [
+                {
+                    "name": "基于大模型的知识图谱构建",
+                    "role": "项目负责人",
+                    "start_date": "2023.01",
+                    "end_date": "2023.12",
+                    "description": "利用LLM自动提取实体关系",
+                    "funding_source": "省级科研基金",
+                    "funding_amount": "30万元",
+                },
+            ],
+            "publications": [
+                {
+                    "title": "Efficient Training of Large Language Models",
+                    "journal": "ACL 2023",
+                    "date": "2023.07",
+                    "authors": "第一作者",
+                    "index": "CCF-A",
+                },
+            ],
+            "awards": [
+                {"date": "2021.05", "title": "国家奖学金", "level": "国家级", "issuer": "教育部"},
+            ],
+            "family_members": [
+                {
+                    "name": "张父",
+                    "relationship": "父亲",
+                    "gender": "男",
+                    "birth_date": "1965.03",
+                    "phone": "13900001111",
+                    "work_unit": "杭州某中学",
+                    "position": "教师",
+                    "political_status": "中共党员",
+                },
+            ],
+            "skills": [
+                {"category": "编程语言", "items": "Python, Java, C++, Go"},
+                {"category": "框架工具", "items": "PyTorch, TensorFlow, Docker, Git"},
+            ],
+            "certificates": ["大学英语六级 (CET-6)", "高校教师资格证"],
+            "languages": ["英语（流利）"],
+            "hobbies": ["阅读", "跑步", "围棋"],
+        }
+        return cls.from_dict(data)
