@@ -836,18 +836,17 @@ class FieldDetector:
         Context-aware: when inside a "配偶" section, uses spouse-specific
         field mappings; when inside "紧急联系人" section, uses emergency
         contact mappings.
-        Handles vertical merges: skips cells that are merge continuations,
-        and avoids writing to cells that share underlying XML with label cells.
-        When a target cell is vertically merged with a cell below, and the
-        row below has a different label at the same column, defers to the
-        row below (let it claim the shared cell).
+        Handles complex merge structures:
+        - Horizontal merges: skip cells sharing the same tc
+        - Vertical merges: skip vMerge continuation cells
+        - Occupied value cells: when the right cell already has a value
+          from a previous row, append the new value on a new line in
+          the label cell (label\nvalue format)
         """
         for table in doc.tables:
             # Track which section context we're in
             current_context: str = "personal"  # default
             filled_cells: set[tuple[int, int]] = set()
-            # Track underlying tc elements that have been written to
-            written_tcs: set[int] = set()
 
             for r_idx, row in enumerate(table.rows):
                 cells = row.cells
@@ -892,6 +891,8 @@ class FieldDetector:
                     ):
                         continue
 
+                    filled = False
+
                     # Strategy 1: Find first empty cell to the right,
                     # skipping horizontally merged cells and duplicate labels
                     for scan_idx in range(c_idx + 1, len(cells)):
@@ -899,45 +900,57 @@ class FieldDetector:
                         # Skip cells that share the same tc (horizontal merge)
                         if next_cell._tc is cell._tc:
                             continue
-                        # Skip cells with same text as label (merged duplicates
-                        # that don't share tc, common in LibreOffice conversions)
+                        # Skip cells with same text as label
                         if next_cell.text.strip() == text:
                             continue
                         # Found a distinct cell — check if it's empty
-                        next_id = (id(row), scan_idx)
-                        next_tc_id = id(next_cell._tc)
                         if not next_cell.text.strip():
-                            if (next_id not in filled_cells
-                                    and next_tc_id not in written_tcs):
+                            next_id = (id(row), scan_idx)
+                            if next_id not in filled_cells:
                                 self._set_cell_text(next_cell, value)
                                 filled_cells.add(next_id)
-                                written_tcs.add(next_tc_id)
+                                filled = True
                         break
+
+                    if filled:
+                        continue
 
                     # Strategy 2: Cell below (next row, same column)
                     if r_idx + 1 < len(table.rows):
                         below_row = table.rows[r_idx + 1]
                         below_cell = below_row.cells[c_idx]
                         below_id = (id(below_row), c_idx)
-                        below_tc_id = id(below_cell._tc)
                         if (not below_cell.text.strip()
                                 and below_id not in filled_cells
-                                and below_tc_id not in written_tcs
                                 and below_cell._tc is not cell._tc):
                             self._set_cell_text(below_cell, value)
                             filled_cells.add(below_id)
-                            written_tcs.add(below_tc_id)
-                            continue
+                            filled = True
 
-                    # Strategy 3: Same cell with "label:___" format
+                    if filled:
+                        continue
+
+                    # Strategy 3: Label cell append (for vertically merged
+                    # value cells where the shared cell is occupied)
+                    # Write value on a new line in the label cell:
+                    # "工作单位\n某某大学"
+                    if value not in stripped_text:
+                        new_text = text + "\n" + value
+                        self._set_cell_text(cell, new_text)
+                        filled_cells.add(cell_id)
+                        filled = True
+
+                    if filled:
+                        continue
+
+                    # Strategy 4: Same cell with "label:___" format
                     if text.endswith(":") or text.endswith("："):
                         new_text = text + " " + value
                         self._set_cell_text(cell, new_text)
                         filled_cells.add(cell_id)
-                        written_tcs.add(id(cell._tc))
                         continue
 
-                    # Strategy 4: Same cell with "label：" + empty space
+                    # Strategy 5: Same cell with "label：" + empty space
                     if "：" in text or ":" in text:
                         new_text = re.sub(
                             r"[:：]\s*$", f"：{value}", text
@@ -945,7 +958,6 @@ class FieldDetector:
                         if new_text != text:
                             self._set_cell_text(cell, new_text)
                             filled_cells.add(cell_id)
-                            written_tcs.add(id(cell._tc))
                             continue
 
         # Also fill paragraph-based labels (label: value format)
