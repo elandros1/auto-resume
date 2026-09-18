@@ -361,39 +361,46 @@ class ResumeData:
                 setattr(resume, f, str(data[f]))
 
         # List/object fields — gracefully handle strings and lists
+        # Helper: filter dict keys to only valid dataclass fields
+        def _filter_fields(d, cls):
+            if not isinstance(d, dict):
+                return {}
+            valid = {f.name for f in __import__("dataclasses").fields(cls)}
+            return {k: v for k, v in d.items() if k in valid}
+
         if "education" in data:
             val = data["education"]
             if isinstance(val, list):
                 resume.education = [
-                    Education(**e) if isinstance(e, dict) else Education()
+                    Education(**_filter_fields(e, Education)) if isinstance(e, dict) else Education()
                     for e in val
                 ]
         if "work_experience" in data:
             val = data["work_experience"]
             if isinstance(val, list):
                 resume.work_experience = [
-                    WorkExperience(**w) if isinstance(w, dict) else WorkExperience()
+                    WorkExperience(**_filter_fields(w, WorkExperience)) if isinstance(w, dict) else WorkExperience()
                     for w in val
                 ]
         if "projects" in data:
             val = data["projects"]
             if isinstance(val, list):
                 resume.projects = [
-                    Project(**p) if isinstance(p, dict) else Project()
+                    Project(**_filter_fields(p, Project)) if isinstance(p, dict) else Project()
                     for p in val
                 ]
         if "publications" in data:
             val = data["publications"]
             if isinstance(val, list):
                 resume.publications = [
-                    Publication(**p) if isinstance(p, dict) else Publication()
+                    Publication(**_filter_fields(p, Publication)) if isinstance(p, dict) else Publication()
                     for p in val
                 ]
         if "awards" in data:
             val = data["awards"]
             if isinstance(val, list):
                 resume.awards = [
-                    Award(**a) if isinstance(a, dict) else Award(title=str(a))
+                    Award(**_filter_fields(a, Award)) if isinstance(a, dict) else Award(title=str(a))
                     for a in val
                 ]
             elif isinstance(val, str):
@@ -402,7 +409,7 @@ class ResumeData:
             val = data["family_members"]
             if isinstance(val, list):
                 resume.family_members = [
-                    FamilyMember(**f) if isinstance(f, dict) else FamilyMember()
+                    FamilyMember(**_filter_fields(f, FamilyMember)) if isinstance(f, dict) else FamilyMember()
                     for f in val
                 ]
         if "skills" in data:

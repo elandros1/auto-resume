@@ -1,0 +1,274 @@
+{
+  "name": "徐仙发",
+  "gender": "男",
+  "birth_date": "1991-10",
+  "age": "34",
+  "phone": "13418255785",
+  "email": "",
+  "address": "",
+  "postal_code": "",
+  "hometown": "广西桂林",
+  "hukou_location": "广西桂林",
+  "political_status": "群众",
+  "id_number": "450321199110280510",
+  "nationality": "汉",
+  "nationality_country": "中国",
+  "marital_status": "已婚",
+  "height": "",
+  "vision": "",
+  "photo_path": "",
+
+  "specialty": "艺术学博士，深入研究区块链技术在数字文化领域的应用，拥有6年高校教学与实践经验，持有高校教师资格证。精通生成式人工智能(AI)视觉重构、计算生成艺术(Processing/p5.js算法代码生成视觉)、区块链数字版权确权(数字水印与分布式存证技术)以及轻量级Web交互工具开发。",
+  "computer_proficiency": "精通生成式AI视觉重构、Processing/p5.js算法代码生成、区块链数字水印与分布式存证技术、轻量级Web交互工具(谷歌浏览器插件等)自主开发",
+  "foreign_language": "",
+  "previous_employer": "广东创新科技职业学院",
+  "current_position": "专任教师",
+  "professional_title": "无",
+  "social_experience": "",
+
+  "job_intent": "高校教师",
+  "applied_position": "专业领域负责人(R2)",
+  "applied_college": "艺术与传媒学院",
+  "expected_position": "教学实践型",
+  "expected_salary": "",
+  "expected_city": "",
+  "availability": "",
+
+  "self_evaluation": "艺术学博士，6年高校教学经验，持有高校教师资格证。核心优势在于\u201c前沿技术与计算美学\u201d的深度交叉与合规落地能力：具备扎实的艺术设计理论底蕴，更掌握前沿且具备长期生命力的技术链条。累计指导学生斩获国际级、国家级及省级竞赛奖项12项，具备前沿技术实操与\u201c以赛促教\u201d成果转化能力。",
+
+  "highest_degree": "博士研究生",
+  "graduation_date": "2026.09",
+  "education_duration": "三年",
+  "birthplace": "广西桂林",
+  "work_start_date": "2018-08",
+  "archive_location": "阳朔人才市场",
+  "insurance_status": "有",
+  "is_retired": "否",
+  "is_fresh_graduate": "否",
+  "recruitment_source": "网络推广",
+  "referrer": "填恒星员工",
+  "position_type": "教学实践型",
+  "affiliated_college": "艺术与传媒学院",
+  "affiliated_department": "",
+  "teachable_courses": "视觉传达设计、数字媒体艺术、设计色彩、室内手绘表达、计算生成艺术与算法设计、生成式AI与数字视觉、数字文化资产与版权保护",
+  "professional_certificate": "高校教师资格证",
+  "academic_positions": "",
+  "talent_title": "",
+  "masters_supervised": "0",
+  "doctors_supervised": "0",
+  "advisor_status": "",
+  "applied_position_code": "专业领域负责人(R2)",
+  "employment_type": "企业劳动合同",
+
+  "spouse_name": "",
+  "spouse_birth_date": "",
+  "spouse_work_unit": "",
+  "spouse_phone": "",
+  "spouse_education": "",
+  "spouse_professional_title": "",
+  "spouse_gender": "",
+  "spouse_hometown": "",
+
+  "emergency_contact": "",
+  "emergency_contact_phone": "",
+  "emergency_contact_relationship": "",
+
+  "childbearing_status": "已婚",
+  "signature": "徐仙发",
+  "remarks": "所属硕士点名称：设计；硕士点专业领域名称：艺术设计；所属本科专业：民族",
+
+  "education": [
+    {
+      "school": "马哈沙拉坎皇家大学",
+      "major": "艺术学",
+      "degree": "博士研究生/艺术学博士",
+      "start_date": "2023.06",
+      "end_date": "2026.09",
+      "education_level": "博士研究生",
+      "education_form": "全日制",
+      "reference_person": "",
+      "reference_phone": "",
+      "description": "深入研究区块链技术在数字文化领域的应用",
+      "research_direction": "区块链技术与数字文化",
+      "duration": "三年",
+      "gpa": ""
+    },
+    {
+      "school": "广西师范大学",
+      "major": "艺术设计",
+      "degree": "硕士研究生/艺术硕士",
+      "start_date": "2016.09",
+      "end_date": "2018.06",
+      "education_level": "硕士研究生",
+      "education_form": "全日制",
+      "reference_person": "",
+      "reference_phone": "",
+      "description": "",
+      "research_direction": "",
+      "duration": "两年",
+      "gpa": ""
+    },
+    {
+      "school": "桂林理工大学",
+      "major": "艺术设计",
+      "degree": "本科/文学学士",
+      "start_date": "2012.09",
+      "end_date": "2016.06",
+      "education_level": "本科",
+      "education_form": "全日制",
+      "reference_person": "",
+      "reference_phone": "",
+      "description": "",
+      "research_direction": "",
+      "duration": "四年",
+      "gpa": ""
+    }
+  ],
+
+  "work_experience": [
+    {
+      "company": "广东创新科技职业学院",
+      "position": "专任教师",
+      "start_date": "2023.03",
+      "end_date": "2026.07",
+      "department": "",
+      "description": "高校教师，主讲设计色彩、室内手绘表达等课程",
+      "reference_person": "",
+      "reference_phone": "",
+      "professional_title": "",
+      "employment_type": "企业劳动合同"
+    },
+    {
+      "company": "江南影视职业学院",
+      "position": "专任教师",
+      "start_date": "2022.10",
+      "end_date": "2023.02",
+      "department": "",
+      "description": "高校教师，主讲艺术设计基础课程",
+      "reference_person": "",
+      "reference_phone": "",
+      "professional_title": "",
+      "employment_type": "企业劳动合同"
+    },
+    {
+      "company": "重庆元树手绘有限公司",
+      "position": "考研教师",
+      "start_date": "2022.06",
+      "end_date": "2022.09",
+      "department": "",
+      "description": "专业教学",
+      "reference_person": "",
+      "reference_phone": "",
+      "professional_title": "",
+      "employment_type": "企业劳动合同"
+    },
+    {
+      "company": "广州羊奶世家有限公司",
+      "position": "销售人员",
+      "start_date": "2021.09",
+      "end_date": "2022.06",
+      "department": "",
+      "description": "",
+      "reference_person": "",
+      "reference_phone": "",
+      "professional_title": "",
+      "employment_type": "企业劳动合同"
+    },
+    {
+      "company": "北海艺术设计学院",
+      "position": "专任教师",
+      "start_date": "2018.08",
+      "end_date": "2021.08",
+      "department": "",
+      "description": "高校教师，主讲景观规划设计、设计基础等课程",
+      "reference_person": "",
+      "reference_phone": "",
+      "professional_title": "",
+      "employment_type": "企业劳动合同"
+    }
+  ],
+
+  "projects": [],
+
+  "publications": [],
+
+  "awards": [
+    {
+      "date": "2025.08",
+      "title": "第五届ICAD国际当代青年美术设计大赛",
+      "level": "优秀指导老师奖（国际级）",
+      "issuer": "国际青年美术设计协会等",
+      "type": "竞赛指导"
+    },
+    {
+      "date": "2024.12",
+      "title": "第三届HKDADC香港数字艺术设计大赛",
+      "level": "优秀指导老师奖（国家级）",
+      "issuer": "香港艺术发展学会",
+      "type": "竞赛指导"
+    },
+    {
+      "date": "2024.06",
+      "title": "美育浸润行动成果展作品",
+      "level": "一等奖（国家级）",
+      "issuer": "中国文化信息协会",
+      "type": "竞赛指导"
+    },
+    {
+      "date": "2024.06",
+      "title": "艺术教育与设计成果",
+      "level": "一等奖",
+      "issuer": "中国文化信息协会",
+      "type": "教学/比赛"
+    },
+    {
+      "date": "2024.06",
+      "title": "室内艺术设计教育成果",
+      "level": "室内艺术设计教育创新成果二等奖",
+      "issuer": "中国文化信息协会",
+      "type": "教学/成果"
+    },
+    {
+      "date": "2023.11",
+      "title": "手绘艺术设计作品",
+      "level": "优秀奖（国家级）",
+      "issuer": "中国手绘艺术设计大赛组委会",
+      "type": "比赛"
+    },
+    {
+      "date": "2023.06",
+      "title": "艺术设计手绘相关创作",
+      "level": "三等奖（省级）",
+      "issuer": "广东省工业工会委员会、广东省创意设计产业研究会",
+      "type": "比赛"
+    },
+    {
+      "date": "2024.04",
+      "title": "第四届G-CROSS全球大学生创意奖",
+      "level": "优秀指导老师奖（国际级）",
+      "issuer": "英国工业设计委员会",
+      "type": "竞赛指导"
+    }
+  ],
+
+  "family_members": [],
+
+  "skills": [
+    {
+      "category": "前沿技术",
+      "items": "生成式AI视觉重构、Processing/p5.js算法代码生成、区块链数字水印与分布式存证、轻量级Web交互工具开发"
+    },
+    {
+      "category": "教学领域",
+      "items": "视觉传达设计、数字媒体艺术、设计色彩、室内手绘表达、景观规划设计"
+    },
+    {
+      "category": "其他技能",
+      "items": "高校教师资格证、6年高校教学经验"
+    }
+  ],
+
+  "certificates": ["高校教师资格证"],
+  "languages": [],
+  "hobbies": []
+}
