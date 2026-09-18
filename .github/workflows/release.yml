@@ -43,7 +43,8 @@ jobs:
           pyinstaller --onefile --name auto-resume \
             --add-data "src/auto_resume/templates:auto_resume/templates" \
             --add-data "src/auto_resume/samples:auto_resume/samples" \
-            src/auto_resume/__main__.py
+            --paths src \
+            src/auto_resume/entry.py
 
       - name: Build executable (Windows)
         if: runner.os == 'Windows'
@@ -51,7 +52,8 @@ jobs:
           pyinstaller --onefile --name auto-resume `
             --add-data "src/auto_resume/templates;auto_resume/templates" `
             --add-data "src/auto_resume/samples;auto_resume/samples" `
-            src/auto_resume/__main__.py
+            --paths src `
+            src/auto_resume/entry.py
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4

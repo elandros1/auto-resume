@@ -33,3 +33,6 @@ output/
 .venv/
 venv/
 .uploads/
+build/
+dist/
+*.spec
