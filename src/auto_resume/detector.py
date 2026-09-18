@@ -8,6 +8,8 @@ Upgraded features:
 - Multi-row batch filling for education/work/project sections
 - Multi-direction blank cell lookup (right / below / same cell)
 - Merged cell awareness
+- Three-layer fuzzy matching: regex → similarity → semantic keywords
+  (auto-recognizes new field name variants without code changes)
 """
 
 from __future__ import annotations
@@ -18,6 +20,8 @@ from pathlib import Path
 from docx import Document
 from docx.table import Table
 from docx.text.paragraph import Paragraph
+
+from .fuzzy_matcher import FuzzyMatcher
 
 # ──────────────────── Field Mapping Tables ────────────────────
 
@@ -284,12 +288,69 @@ class FieldDetector:
             (re.compile(p, re.IGNORECASE), ctx)
             for p, ctx in SECTION_BOUNDARY_PATTERNS
         ]
+        # Fuzzy matcher for auto-recognizing unknown field variants
+        self._fuzzy = FuzzyMatcher()
 
     # ──────────────────── Public API ────────────────────
+
+    def _match_label(
+        self, text: str, context: str = "personal"
+    ) -> tuple[str | None, float, str]:
+        """Match a label to a resume key using three layers.
+
+        Layer 1: Regex patterns (FIELD_MAPPINGS or context overrides)
+        Layer 2: Fuzzy similarity matching (auto-recognizes variants)
+        Layer 3: Semantic keyword matching (catches new wordings)
+
+        Args:
+            text: The label text from the document.
+            context: Current section context (e.g. "spouse", "emergency_contact").
+
+        Returns:
+            (key, score, method) — key is None if no match.
+        """
+        text = text.strip()
+        if not text:
+            return None, 0.0, "none"
+
+        # Layer 1: Regex (with context overrides)
+        mapping_set: list[tuple[re.Pattern, str]]
+        if context == "spouse":
+            mapping_set = self._spouse_compiled + self._compiled
+        elif context == "emergency_contact":
+            mapping_set = self._emergency_contact_compiled + self._compiled
+        else:
+            mapping_set = self._compiled
+
+        for pattern, key in mapping_set:
+            if pattern.search(text):
+                return key, 1.0, "regex"
+
+        # Layer 2 + 3: Fuzzy matching (auto-recognize unknown variants)
+        # Use context-specific fuzzy match if available
+        if context == "spouse":
+            # For spouse context, try matching to spouse fields first
+            for pattern, key in self._spouse_compiled:
+                result = self._fuzzy.match(text)
+                if result.key and result.key.startswith("spouse"):
+                    return result.key, result.score, result.method
+        elif context == "emergency_contact":
+            for pattern, key in self._emergency_contact_compiled:
+                result = self._fuzzy.match(text)
+                if result.key and "emergency" in result.key:
+                    return result.key, result.score, result.method
+
+        # General fuzzy match
+        result = self._fuzzy.match(text)
+        if result.key:
+            return result.key, result.score, result.method
+
+        return None, 0.0, "none"
 
     def detect_fields(self, doc_path: str | Path) -> dict[str, list[str]]:
         """Scan a Word document for recognizable field labels.
 
+        Uses three-layer matching: regex → fuzzy similarity → semantic keywords.
         Returns a dict: {resume_key: [list of cell/paragraph references]}
         """
         doc_path = Path(doc_path)
@@ -302,27 +363,37 @@ class FieldDetector:
             text = para.text.strip()
             if not text:
                 continue
-            for pattern, key in self._compiled:
-                if pattern.search(text):
-                    results.setdefault(key, []).append(f"P:{i}")
+            key, score, method = self._match_label(text)
+            if key:
+                results.setdefault(key, []).append(f"P:{i}")
 
         # Scan tables
+        current_context = "personal"
         for t_idx, table in enumerate(doc.tables):
             for r_idx, row in enumerate(table.rows):
+                row_text = " ".join(c.text.strip() for c in row.cells).strip()
+                # Update context
+                for pattern, ctx in self._boundary_compiled:
+                    if pattern.search(row_text):
+                        current_context = ctx
+                        break
                 for c_idx, cell in enumerate(row.cells):
                     text = cell.text.strip()
                     if not text:
                         continue
-                    for pattern, key in self._compiled:
-                        if pattern.search(text):
-                            ref = f"T:{t_idx}:R:{r_idx}:C:{c_idx}"
-                            if ref not in results.setdefault(key, []):
-                                results[key].append(ref)
+                    key, score, method = self._match_label(text, current_context)
+                    if key:
+                        ref = f"T:{t_idx}:R:{r_idx}:C:{c_idx}"
+                        if ref not in results.setdefault(key, []):
+                            results[key].append(ref)
 
         return results
 
     def preview_mapping(self, doc_path: str | Path) -> list[dict[str, str]]:
-        """Preview what fields would be detected and mapped."""
+        """Preview what fields would be detected and mapped.
+
+        Shows all matches including fuzzy matches with confidence scores.
+        """
         doc_path = Path(doc_path)
         doc = Document(str(doc_path))
 
@@ -331,17 +402,27 @@ class FieldDetector:
         # Scan paragraphs
         for i, para in enumerate(doc.paragraphs):
             text = para.text.strip()
-            for pattern, key in self._compiled:
-                if pattern.search(text):
-                    previews.append({
-                        "label": text[:50],
-                        "resume_key": key,
-                        "location": f"段落 {i}",
-                    })
+            if not text:
+                continue
+            key, score, method = self._match_label(text)
+            if key:
+                previews.append({
+                    "label": text[:50],
+                    "resume_key": key,
+                    "confidence": f"{score:.0%}",
+                    "method": method,
+                    "location": f"段落 {i}",
+                })
 
-        # Scan tables — include section header detection
+        # Scan tables
+        current_context = "personal"
         for t_idx, table in enumerate(doc.tables):
             for r_idx, row in enumerate(table.rows):
+                row_text = " ".join(c.text.strip() for c in row.cells).strip()
+                for pattern, ctx in self._boundary_compiled:
+                    if pattern.search(row_text):
+                        current_context = ctx
+                        break
                 for c_idx, cell in enumerate(row.cells):
                     text = cell.text.strip()
                     if not text:
@@ -353,17 +434,21 @@ class FieldDetector:
                             previews.append({
                                 "label": text[:50],
                                 "resume_key": f"{prefix}_section",
+                                "confidence": "100%",
+                                "method": "section",
                                 "location": f"表格{t_idx} 行{r_idx} 列{c_idx}",
                             })
 
-                    # Check individual field labels
-                    for pattern, key in self._compiled:
-                        if pattern.search(text):
-                            previews.append({
-                                "label": text[:50],
-                                "resume_key": key,
-                                "location": f"表格{t_idx} 行{r_idx} 列{c_idx}",
-                            })
+                    # Check individual field labels (three-layer)
+                    key, score, method = self._match_label(text, current_context)
+                    if key:
+                        previews.append({
+                            "label": text[:50],
+                            "resume_key": key,
+                            "confidence": f"{score:.0%}",
+                            "method": method,
+                            "location": f"表格{t_idx} 行{r_idx} 列{c_idx}",
+                        })
 
         return previews
 
@@ -610,12 +695,13 @@ class FieldDetector:
     ) -> dict[int, str]:
         """Detect which column maps to which field suffix.
 
+        Uses regex patterns first, then falls back to fuzzy matching
+        for unrecognized column headers.
+
         Returns: {col_index: field_suffix}
         e.g. {0: "date_range", 1: "school", 2: "major", 3: "degree"}
         """
         col_patterns = self._column_compiled.get(prefix, [])
-        if not col_patterns:
-            return {}
 
         column_map: dict[int, str] = {}
 
@@ -623,12 +709,23 @@ class FieldDetector:
             text = cell.text.strip()
             if not text:
                 continue
+
+            # Layer 1: Regex patterns
+            matched = False
             for pattern, suffix in col_patterns:
                 if pattern.search(text):
-                    # Don't overwrite if already mapped (merged cells)
                     if c_idx not in column_map:
                         column_map[c_idx] = suffix
+                    matched = True
                     break
+
+            if matched:
+                continue
+
+            # Layer 2: Fuzzy match for unrecognized headers
+            suffix, score = self._fuzzy.match_column(text, prefix)
+            if suffix and c_idx not in column_map:
+                column_map[c_idx] = suffix
 
         return column_map
 
@@ -686,9 +783,10 @@ class FieldDetector:
     def _fill_single_value_labels(self, doc: Document, data: dict[str, str]) -> None:
         """Smart-detect label cells and fill adjacent blanks (multi-direction).
 
+        Uses three-layer matching: regex → fuzzy → semantic keywords.
         Context-aware: when inside a "配偶" section, uses spouse-specific
-        field mappings instead of general ones.
-        When inside "紧急联系人" section, uses emergency contact mappings.
+        field mappings; when inside "紧急联系人" section, uses emergency
+        contact mappings.
         """
         for table in doc.tables:
             # Track which section context we're in
@@ -715,92 +813,83 @@ class FieldDetector:
                     if cell_id in filled_cells:
                         continue
 
-                    # Determine which mapping set to use based on context
-                    if current_context == "spouse":
-                        mapping_set = self._spouse_compiled + self._compiled
-                    elif current_context == "emergency_contact":
-                        mapping_set = (
-                            self._emergency_contact_compiled + self._compiled
+                    # Three-layer match: regex → fuzzy → semantic
+                    key, score, method = self._match_label(
+                        text, current_context
+                    )
+                    if not key:
+                        continue
+
+                    value = data.get(key, "")
+                    if not value:
+                        continue
+
+                    # Skip if cell already contains exactly this value
+                    # (avoid substring false positives)
+                    stripped_text = cell.text.strip()
+                    if (
+                        stripped_text.endswith(value)
+                        and len(stripped_text) <= len(value) + 5
+                    ):
+                        continue
+
+                    # Strategy 1: Adjacent right cell
+                    if c_idx + 1 < len(cells):
+                        next_cell = cells[c_idx + 1]
+                        next_id = (id(row), c_idx + 1)
+                        if not next_cell.text.strip() and next_id not in filled_cells:
+                            self._set_cell_text(next_cell, value)
+                            filled_cells.add(next_id)
+                            continue
+
+                    # Strategy 2: Cell below (next row, same column)
+                    if r_idx + 1 < len(table.rows):
+                        below_row = table.rows[r_idx + 1]
+                        below_cell = below_row.cells[c_idx]
+                        below_id = (id(below_row), c_idx)
+                        if (not below_cell.text.strip()
+                                and below_id not in filled_cells):
+                            self._set_cell_text(below_cell, value)
+                            filled_cells.add(below_id)
+                            continue
+
+                    # Strategy 3: Same cell with "label:___" format
+                    if text.endswith(":") or text.endswith("："):
+                        new_text = text + " " + value
+                        self._set_cell_text(cell, new_text)
+                        filled_cells.add(cell_id)
+                        continue
+
+                    # Strategy 4: Same cell with "label：" + empty space
+                    if "：" in text or ":" in text:
+                        new_text = re.sub(
+                            r"[:：]\s*$", f"：{value}", text
                         )
-                    else:
-                        mapping_set = self._compiled
-
-                    for pattern, key in mapping_set:
-                        if not pattern.search(text):
-                            continue
-
-                        # For spouse/emergency context, skip if general
-                        # mapping already matched and value is empty
-                        value = data.get(key, "")
-                        if not value:
-                            continue
-
-                        # Skip if cell already contains exactly this value
-                        # (avoid substring false positives)
-                        stripped_text = cell.text.strip()
-                        if (
-                            stripped_text.endswith(value)
-                            and len(stripped_text) <= len(value) + 5
-                        ):
-                            break
-
-                        # Strategy 1: Adjacent right cell
-                        if c_idx + 1 < len(cells):
-                            next_cell = cells[c_idx + 1]
-                            next_id = (id(row), c_idx + 1)
-                            if not next_cell.text.strip() and next_id not in filled_cells:
-                                self._set_cell_text(next_cell, value)
-                                filled_cells.add(next_id)
-                                break
-
-                        # Strategy 2: Cell below (next row, same column)
-                        if r_idx + 1 < len(table.rows):
-                            below_row = table.rows[r_idx + 1]
-                            below_cell = below_row.cells[c_idx]
-                            below_id = (id(below_row), c_idx)
-                            if (not below_cell.text.strip()
-                                    and below_id not in filled_cells):
-                                self._set_cell_text(below_cell, value)
-                                filled_cells.add(below_id)
-                                break
-
-                        # Strategy 3: Same cell with "label:___" format
-                        if text.endswith(":") or text.endswith("："):
-                            new_text = text + " " + value
+                        if new_text != text:
                             self._set_cell_text(cell, new_text)
                             filled_cells.add(cell_id)
-                            break
-
-                        # Strategy 4: Same cell with "label：" + empty space
-                        if "：" in text or ":" in text:
-                            new_text = re.sub(
-                                r"[:：]\s*$", f"：{value}", text
-                            )
-                            if new_text != text:
-                                self._set_cell_text(cell, new_text)
-                                filled_cells.add(cell_id)
-                                break
+                            continue
 
         # Also fill paragraph-based labels (label: value format)
         for para in doc.paragraphs:
             text = para.text.strip()
             if not text:
                 continue
-            for pattern, key in self._compiled:
-                if pattern.search(text):
-                    value = data.get(key, "")
-                    if not value:
-                        continue
-                    match = re.match(
-                        r"^(.*?[:：])\s*$", text
-                    )
-                    if match and not text[len(match.group(1)):].strip():
-                        prefix_label = match.group(1)
-                        if para.runs:
-                            para.runs[0].text = f"{prefix_label} {value}"
-                            for run in para.runs[1:]:
-                                run.text = ""
-                        break
+            key, score, method = self._match_label(text)
+            if not key:
+                continue
+            value = data.get(key, "")
+            if not value:
+                continue
+            match = re.match(
+                r"^(.*?[:：])\s*$", text
+            )
+            if match and not text[len(match.group(1)):].strip():
+                prefix_label = match.group(1)
+                if para.runs:
+                    para.runs[0].text = f"{prefix_label} {value}"
+                    for run in para.runs[1:]:
+                        run.text = ""
 
     # ──────────────────── Utility Methods ────────────────────
 
