@@ -63,7 +63,7 @@ FIELD_MAPPINGS: list[tuple[str, str]] = [
     # Section headers as single-value fallback (when no multi-row table)
     (r"教育背景|教育经历|学习\s*经历|学历背景|学习简历|教育情况", "education_summary"),
     (r"工作经历|工作背景|工作简历|工作情况", "work_experience_summary"),
-    (r"所学专业", "education_1_major"),
+    (r"所学专业|^专\s*业$|毕业专业", "education_1_major"),
     (r"毕业学校", "education_summary"),
     (r"毕业时间", "graduation_date"),
     # ── Health & status ──
@@ -94,7 +94,7 @@ FIELD_MAPPINGS: list[tuple[str, str]] = [
     (r"配偶职称", "spouse_professional_title"),
     (r"配偶性别", "spouse_gender"),
     # ── Additional form fields ──
-    (r"最高学位|最高学历", "highest_degree"),
+    (r"最高学位|最高学历|学\s*历|学\s*位", "highest_degree"),
     (r"主要科研成果|科研成果", "research_achievements"),
     (r"备\s*注", "remarks"),
     # ── Extra fields from various universities ──
@@ -139,7 +139,7 @@ FIELD_MAPPINGS: list[tuple[str, str]] = [
 
 # Fallback fields: when a primary field is empty, try these alternatives
 FIELD_FALLBACKS: dict[str, list[str]] = {
-    "highest_degree": ["education_1_education_level"],
+    "highest_degree": ["education_1_degree", "education_1_education_level"],
     "graduation_date": ["education_1_end_date"],
     "education_summary": ["education_1_school"],
     "education_section": ["education_summary", "education_1_school"],
@@ -216,7 +216,7 @@ COLUMN_MAPPINGS: dict[str, dict[str, str]] = {
         r"研究方向|方向|研究方\s*向|课题方向": "research_direction",
         r"学习层次|层次|培养层次|学历层次": "education_level",
         r"学习形式|办学形式|培养方式|就读形式": "education_form",
-        r"证明人电话|证明电话": "reference_phone",
+        r"证明人.*电话|证明电话": "reference_phone",
         r"证明人|证人": "reference_person",
         r"GPA|成绩|学业绩点|成绩绩点": "gpa",
         r"备注|说明|描述|备注说明": "description",
@@ -234,7 +234,7 @@ COLUMN_MAPPINGS: dict[str, dict[str, str]] = {
         ),
         r"部门|院系|科室|所在部门": "department",
         # 证明人电话 BEFORE 证明人 (specific before generic)
-        r"证明人电话|证明电话": "reference_phone",
+        r"证明人.*电话|证明电话": "reference_phone",
         r"证明人|证人": "reference_person",
         r"工作内容|职责|描述|备注|工作内容描述|教学专业|"
         r"任教专业|教授课程|教学内容|工作职责|主要工作": "description",
@@ -537,10 +537,10 @@ class FieldDetector:
         self._fill_all_placeholders(doc, data)
 
         # Phase 2: Detect and fill multi-row sections
-        self._fill_section_tables(doc, data)
+        filled_tables = self._fill_section_tables(doc, data)
 
         # Phase 3: Smart-detect remaining single-value labels
-        self._fill_single_value_labels(doc, data)
+        self._fill_single_value_labels(doc, data, filled_tables)
 
         output_path.parent.mkdir(parents=True, exist_ok=True)
         doc.save(str(output_path))
@@ -584,19 +584,98 @@ class FieldDetector:
 
     # ──────────────────── Phase 2: Section Tables ────────────────────
 
-    def _fill_section_tables(self, doc: Document, data: dict[str, str]) -> None:
+    def _fill_section_tables(
+        self, doc: Document, data: dict[str, str]
+    ) -> set[int]:
         """Detect multi-row section tables and fill them by column mapping.
 
-        This handles tables like:
-        | 教育经历 (merged header) |
-        | 起止时间 | 院校名称 | 专业 | 学位 |
-        | (blank)  | (blank)  | (blank) | (blank) |
-        | (blank)  | (blank)  | (blank) | (blank) |
+        Handles two layouts:
+        1. Section header inside a table cell (e.g. merged header row)
+        2. Section header as a paragraph BEFORE the table (e.g. "教育背景"
+           paragraph followed by a separate table with column headers)
 
         The blank rows are filled with education_1_*, education_2_*, etc.
+
+        Returns: set of table indices that were filled as section tables.
         """
-        for table in doc.tables:
-            self._process_single_table_sections(table, data)
+        filled_table_indices: set[int] = set()
+
+        # First: detect paragraph-based section headers and map them
+        # to the table that immediately follows
+        para_section_map: dict[int, str] = {}  # {table_index: section_prefix}
+        body_elements = list(doc.element.body)
+
+        # Build a list of (element, type) to map paragraphs to tables
+        table_idx = 0
+        current_section: str | None = None
+        for elem in body_elements:
+            if elem.tag.endswith('}p'):
+                # It's a paragraph — check for section header
+                para_text = "".join(
+                    t.text or "" for t in elem.iter() if t.text
+                ).strip()
+                for pattern, prefix in self._section_compiled.items():
+                    if pattern.search(para_text):
+                        current_section = prefix
+                        break
+            elif elem.tag.endswith('}tbl'):
+                # It's a table — associate current_section with this table
+                if current_section:
+                    para_section_map[table_idx] = current_section
+                    current_section = None  # Reset after associating
+                table_idx += 1
+
+        # Process each table
+        for t_idx, table in enumerate(doc.tables):
+            # Check if this table was associated with a paragraph section header
+            if t_idx in para_section_map:
+                prefix = para_section_map[t_idx]
+                self._fill_table_by_section(table, prefix, data)
+                filled_table_indices.add(t_idx)
+            else:
+                sections_found = self._process_single_table_sections(
+                    table, data, return_found=True
+                )
+                if sections_found:
+                    filled_table_indices.add(t_idx)
+
+        return filled_table_indices
+
+    def _fill_table_by_section(
+        self, table: Table, section_prefix: str, data: dict[str, str]
+    ) -> None:
+        """Fill a table that was preceded by a paragraph section header.
+
+        The first row is assumed to be the column header row.
+        """
+        if len(table.rows) < 2:
+            return
+
+        # Detect column mappings from the first row
+        column_map = self._detect_column_mappings(
+            table.rows[0], section_prefix
+        )
+        if not column_map:
+            return
+
+        # Determine data count
+        count_key = f"{section_prefix}_count"
+        if section_prefix == "work":
+            count_key = "work_experience_count"
+        elif section_prefix == "family":
+            count_key = "family_members_count"
+        data_count = int(data.get(count_key, "0"))
+        if data_count == 0:
+            return
+
+        # Fill data rows (starting from row 1, after header)
+        filled_cells: set[tuple[int, int]] = set()
+        for entry_idx in range(1, min(data_count, len(table.rows) - 1) + 1):
+            target_r_idx = entry_idx  # Row 0 is header, data starts at 1
+            row = table.rows[target_r_idx]
+            self._fill_row_by_column_map(
+                row, column_map, section_prefix, entry_idx, data, filled_cells
+            )
 
     def _process_single_table(self, table: Table, data: dict[str, str]) -> None:
         """Process a single table for section detection and filling."""
@@ -651,9 +730,13 @@ class FieldDetector:
             self._fill_row_by_column_map(row, column_map, section_prefix, entry_idx, data)
 
     def _process_single_table_sections(
-        self, table: Table, data: dict[str, str]
-    ) -> None:
-        """Process a table, handling both section-header and non-section tables."""
+        self, table: Table, data: dict[str, str],
+        return_found: bool = False,
+    ) -> bool:
+        """Process a table, handling both section-header and non-section tables.
+
+        Returns True if section headers were found and processed.
+        """
         # Detect section headers anywhere in the table
         section_locations: list[tuple[int, str]] = []
 
@@ -665,10 +748,12 @@ class FieldDetector:
                     break
 
         if not section_locations:
-            return
+            return False
 
         for header_r_idx, prefix in section_locations:
             self._fill_one_section(table, header_r_idx, prefix, data)
+
+        return True
 
     def _fill_one_section(
         self,
@@ -872,7 +957,10 @@ class FieldDetector:
         except (IndexError, AttributeError):
             return False
 
-    def _fill_single_value_labels(self, doc: Document, data: dict[str, str]) -> None:
+    def _fill_single_value_labels(
+        self, doc: Document, data: dict[str, str],
+        filled_tables: set[int] | None = None,
+    ) -> None:
         """Smart-detect label cells and fill adjacent blanks (multi-direction).
 
         Uses three-layer matching: regex → fuzzy → semantic keywords.
@@ -885,8 +973,18 @@ class FieldDetector:
         - Occupied value cells: when the right cell already has a value
           from a previous row, append the new value on a new line in
           the label cell (label\nvalue format)
+
+        Args:
+            filled_tables: Set of table indices already filled by section
+                          table filler. These tables are skipped entirely.
         """
-        for table in doc.tables:
+        if filled_tables is None:
+            filled_tables = set()
+
+        for t_idx, table in enumerate(doc.tables):
+            # Skip tables already processed by section table filler
+            if t_idx in filled_tables:
+                continue
             # Track which section context we're in
             current_context: str = "personal"  # default
             filled_cells: set[tuple[int, int]] = set()

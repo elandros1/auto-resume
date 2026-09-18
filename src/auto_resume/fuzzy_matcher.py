@@ -129,7 +129,7 @@ FIELD_ALIASES: dict[str, list[str]] = {
     "spouse_gender": ["配偶性别"],
 
     # ── Additional form fields ──
-    "highest_degree": ["最高学位", "最高学历"],
+    "highest_degree": ["最高学位", "最高学历", "学历", "学位", "学历学位"],
     "research_achievements": ["主要科研成果", "科研成果", "科研成果及"],
     "remarks": ["备注", "说明", "附注"],
 
@@ -240,7 +240,7 @@ COLUMN_ALIASES: dict[str, dict[str, list[str]]] = {
             "专业", "所学专业", "专业名称", "学习专业",
             "专业方向", "毕业专业",
         ],
-        "degree": ["学历", "学位", "学历层次", "学位名称", "学位类型"],
+        "degree": ["学历层次", "学位名称", "学位类型"],
         "education_duration": ["学制", "学制年限"],
         "research_direction": ["研究方向", "方向", "课题方向", "专业（方向）", "专业方向"],
         "education_level": ["学习层次", "层次", "培养层次", "学历层次"],
