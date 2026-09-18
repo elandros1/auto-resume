@@ -134,6 +134,15 @@ FIELD_MAPPINGS: list[tuple[str, str]] = [
     (r"兴趣爱好|爱\s*好", "hobbies_summary"),
 ]
 
+# Fallback fields: when a primary field is empty, try these alternatives
+FIELD_FALLBACKS: dict[str, list[str]] = {
+    "highest_degree": ["education_1_education_level"],
+    "graduation_date": ["education_1_end_date"],
+    "education_summary": ["education_1_school"],
+    "previous_employer": ["work_1_company"],
+    "professional_title": ["work_1_professional_title"],
+}
+
 # Override mappings for spouse section: when inside "配偶" section,
 # these patterns take priority over the general FIELD_MAPPINGS
 SPOUSE_FIELD_OVERRIDES: list[tuple[str, str]] = [
@@ -909,6 +918,13 @@ class FieldDetector:
                         continue
 
                     value = data.get(key, "")
+                    if not value:
+                        # Try fallback fields
+                        for fb_key in FIELD_FALLBACKS.get(key, []):
+                            fb_value = data.get(fb_key, "")
+                            if fb_value:
+                                value = fb_value
+                                break
                     if not value:
                         continue
 

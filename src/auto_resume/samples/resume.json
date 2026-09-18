@@ -17,6 +17,12 @@
   "vision": "5.0/5.0",
   "photo_path": "",
 
+  "highest_degree": "博士研究生",
+  "graduation_date": "2024.06",
+  "signature": "张三",
+  "birthplace": "浙江杭州",
+  "education_duration": "五年",
+
   "specialty": "人工智能与机器学习，擅长自然语言处理和大模型训练",
   "computer_proficiency": "熟练使用Python、Java、C++，精通PyTorch、TensorFlow框架",
   "foreign_language": "英语（CET-6，流利，可作为工作语言）；日语（日常会话）",

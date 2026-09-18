@@ -103,6 +103,60 @@ auto-resume keys -r my_resume.json
 - `{{name}}` — 双花括号语法
 - `${name}` — 美元花括号语法
 
+## 三种填充模式
+
+| 模式 | 命令参数 | 原理 | 适配性 |
+|------|---------|------|--------|
+| **AI 模式** | `--ai` | 大模型自动理解每个标签含义 | 适配任何高校，终极方案 |
+| **智能模式** | `--smart`（默认） | 正则+模糊+语义三层匹配 | 覆盖 90%+ 常见字段 |
+| **基础模式** | `--no-smart` | 替换 {{占位符}} | 需模板有占位符 |
+
+### AI 模式（终极方案）
+
+使用大语言模型（DeepSeek/OpenAI 等）自动理解模板中每个标签的含义，映射到你的简历数据字段。**不管高校模板怎么变，AI 都能自动适配，无需改代码。**
+
+```bash
+# 设置 API Key（推荐 DeepSeek，便宜好用）
+export AI_API_KEY="sk-your-key"
+
+# AI 模式填充任意高校模板
+auto-resume fill -r my_resume.json -t 福建水利电力.docx --ai
+
+# AI 模式预览
+auto-resume preview -r my_resume.json -t 某高校模板.docx --ai
+
+# 批量 AI 填充
+auto-resume fill -r my_resume.json -d 模板目录/ --ai
+
+# 也可以用其他模型
+auto-resume fill -r my_resume.json -t template.docx \
+  --ai --ai-model gpt-4o \
+  --ai-base-url https://api.openai.com/v1 \
+  --ai-key sk-xxx
+```
+
+#### 隐私保护
+
+AI 模式**只发送模板中的字段标签**（如"姓名""联系电话"）给大模型，**绝不发送你的个人数据**。大模型只做字段映射，填充在本地完成。
+
+### 智能模式（默认）
+
+工具扫描 Word 文档中的中文标签，通过三层匹配引擎自动识别：
+
+1. **正则精确匹配** — 80+ 个预置模式，快速匹配已知字段
+2. **模糊相似度匹配** — 自动识别拼写变体和近义词（"电邮地址"→email）
+3. **语义关键词匹配** — 按关键词推断完全没见过的写法（"可上班日期"→availability）
+
+支持 50+ 个字段，包括：姓名、性别、出生年月、籍贯、民族、政治面貌、学历、学位、邮箱、电话、身份证、地址、婚姻状况、应聘岗位、学习经历（多行）、工作经历（多行）、家庭成员（多行）等。
+
+### 复杂表格处理
+
+- **水平合并单元格**：自动跳过合并区域，找到值单元格
+- **垂直合并单元格**：检测 vMerge，防止跨行串值
+- **多行表格区域**：自动识别学习/工作/家庭经历表头，按行批量填充
+- **上下文感知**：在"配偶"区域内，"姓名"自动映射到配偶姓名
+- **字段回退**：当主要字段为空时，自动尝试备选字段
+
 ## 使用任意学校的表格
 
 ```bash
@@ -131,9 +185,11 @@ auto-resume fill -r my_resume.json -t 学校B登记表.docx -o output/
 src/auto_resume/
 ├── __init__.py          # 包入口
 ├── __main__.py          # CLI 命令（fill/preview/generate/keys/new）
-├── models.py            # 简历数据模型
+├── models.py            # 简历数据模型（50+ 字段）
 ├── engine.py            # 模板填充引擎（占位符替换）
-├── detector.py          # 智能字段识别（自动检测中文标签）
+├── detector.py          # 智能字段识别（四层匹配+合并单元格处理）
+├── ai_mapper.py         # AI 大模型字段映射（终极方案）
+├── fuzzy_matcher.py     # 模糊相似度+语义关键词匹配
 ├── template_generator.py # 内置模板生成器
 ├── samples/
 │   └── resume.json      # 示例简历数据
