@@ -291,6 +291,9 @@ class ResumeData:
     work_experience_summary: str = ""  # 工作经历概述
     skills_summary: str = ""          # 专业技能概述
     certificates_summary: str = ""    # 证书概述
+    work_years: str = ""              # 工作年限
+    military_service: str = ""        # 参军情况
+    info_channel: str = ""            # 招聘信息获取渠道
 
     # ── Lists (multi-entry) ──
     education: list[Education] = field(default_factory=list)
@@ -351,6 +354,7 @@ class ResumeData:
             "signature", "education_duration", "graduation_date",
             "awards_summary", "education_summary", "work_experience_summary",
             "skills_summary", "certificates_summary",
+            "work_years", "military_service", "info_channel",
         ]
         for f in simple_fields:
             if f in data:
@@ -436,6 +440,8 @@ class ResumeData:
                     "end", "end_date"
                 ).replace("level", "education_level").replace(
                     "form", "education_form"
+                ).replace("witness_phone", "reference_phone").replace(
+                    "witness", "reference_person"
                 ): v
                 for k, v in data.items()
                 if k.startswith(prefix)
@@ -550,6 +556,7 @@ class ResumeData:
             "signature", "education_duration", "graduation_date",
             "awards_summary", "education_summary", "work_experience_summary",
             "skills_summary", "certificates_summary",
+            "work_years", "military_service", "info_channel",
         ]
 
         for f in simple_fields:

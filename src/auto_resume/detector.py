@@ -48,6 +48,9 @@ FIELD_MAPPINGS: list[tuple[str, str]] = [
     (r"邮\s*编|邮政编码|邮编代码", "postal_code"),
     (r"身\s*高|身高cm|身高CM", "height"),
     (r"视\s*力|眼睛度数", "vision"),
+    (r"工作年限|工作年\s*限|工\s*龄|工作年龄", "work_years"),
+    (r"参军情况|服役情况|是否参军|参军经历|兵役情况", "military_service"),
+    (r"招聘信息获取渠道|信息获取渠道|获取渠道|招聘渠道|信息来源", "info_channel"),
     (r"照片|相片", "photo_path"),
     # ── Professional info (specific before generic) ──
     (r"学术专长|专业特长|专长|特长", "specialty"),
