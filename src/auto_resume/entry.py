@@ -38,7 +38,7 @@ console = Console()
 
 
 @click.group()
-@click.version_option("1.4.2", prog_name="auto-resume")
+@click.version_option("1.4.3", prog_name="auto-resume")
 def cli() -> None:
     """Auto-Resume: 一份简历数据，自动填充到任意学校的招聘表格"""
 

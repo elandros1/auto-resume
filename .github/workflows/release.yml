@@ -22,6 +22,7 @@ jobs:
     name: Build standalone executables
     needs: test
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
@@ -37,14 +38,25 @@ jobs:
           pip install pyinstaller
           pip install -e .
 
-      - name: Build executable (Linux/macOS)
-        if: runner.os != 'Windows'
+      - name: Build executable (Linux)
+        if: runner.os == 'Linux'
         run: |
           pyinstaller --onefile --name auto-resume \
             --add-data "src/auto_resume/templates:auto_resume/templates" \
             --add-data "src/auto_resume/samples:auto_resume/samples" \
             --paths src \
             src/auto_resume/entry.py
+          mv dist/auto-resume dist/auto-resume-linux
+
+      - name: Build executable (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          pyinstaller --onefile --name auto-resume \
+            --add-data "src/auto_resume/templates:auto_resume/templates" \
+            --add-data "src/auto_resume/samples:auto_resume/samples" \
+            --paths src \
+            src/auto_resume/entry.py
+          mv dist/auto-resume dist/auto-resume-macos
 
       - name: Build executable (Windows)
         if: runner.os == 'Windows'
@@ -54,6 +66,7 @@ jobs:
             --add-data "src/auto_resume/samples;auto_resume/samples" `
             --paths src `
             src/auto_resume/entry.py
+          mv dist/auto-resume.exe dist/auto-resume-windows.exe
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -80,7 +93,9 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: dist/
-          merge-matching: true
+
+      - name: List artifacts
+        run: find dist/ -type f
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -90,5 +105,6 @@ jobs:
           draft: false
           prerelease: false
           files: |
-            dist/*
-            dist/**/*
+            dist/auto-resume-Linux/*
+            dist/auto-resume-Windows/*
+            dist/auto-resume-macOS/*
