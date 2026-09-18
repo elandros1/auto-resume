@@ -317,6 +317,176 @@ class TestFieldDetector:
             detector.auto_fill(template, data, out)
             assert out.exists()
 
+    # ─── New tests for upgraded detector ───
+
+    def test_multi_row_education_section(self, sample_resume, tmp_path):
+        """Test filling a multi-row education section with column headers."""
+        doc = Document()
+        table = doc.add_table(rows=4, cols=4)
+        table.style = "Table Grid"
+        # Row 0: Section header
+        table.rows[0].cells[0].text = "教育经历"
+        # Row 1: Column headers
+        table.rows[1].cells[0].text = "起止时间"
+        table.rows[1].cells[1].text = "院校名称"
+        table.rows[1].cells[2].text = "专业"
+        table.rows[1].cells[3].text = "学位"
+        # Rows 2-3: blank (to be filled)
+
+        template_path = tmp_path / "edu_section.docx"
+        doc.save(str(template_path))
+
+        # Add a second education entry
+        data = sample_resume.to_flat_dict()
+        # Override with 2 education entries
+        data["education_count"] = "2"
+        data["education_2_school"] = "本科大学"
+        data["education_2_major"] = "软件工程"
+        data["education_2_degree"] = "学士"
+        data["education_2_start_date"] = "2015.09"
+        data["education_2_end_date"] = "2018.06"
+
+        detector = FieldDetector()
+        output_path = tmp_path / "filled_edu.docx"
+        detector.auto_fill(template_path, data, output_path)
+
+        result_doc = Document(str(output_path))
+        result_table = result_doc.tables[0]
+
+        # Row 2 should have education_1 data
+        assert "2018.09" in result_table.rows[2].cells[0].text
+        assert "测试大学" in result_table.rows[2].cells[1].text
+        assert "计算机科学" in result_table.rows[2].cells[2].text
+        assert "硕士" in result_table.rows[2].cells[3].text
+
+        # Row 3 should have education_2 data
+        assert "2015.09" in result_table.rows[3].cells[0].text
+        assert "本科大学" in result_table.rows[3].cells[1].text
+        assert "软件工程" in result_table.rows[3].cells[2].text
+        assert "学士" in result_table.rows[3].cells[3].text
+
+    def test_multi_row_work_section(self, sample_resume, tmp_path):
+        """Test filling a multi-row work experience section."""
+        doc = Document()
+        table = doc.add_table(rows=3, cols=4)
+        table.style = "Table Grid"
+        table.rows[0].cells[0].text = "工作经历"
+        table.rows[1].cells[0].text = "起止时间"
+        table.rows[1].cells[1].text = "工作单位"
+        table.rows[1].cells[2].text = "职务"
+        table.rows[1].cells[3].text = "工作内容"
+        # Row 2: blank
+
+        template_path = tmp_path / "work_section.docx"
+        doc.save(str(template_path))
+
+        data = sample_resume.to_flat_dict()
+        detector = FieldDetector()
+        output_path = tmp_path / "filled_work.docx"
+        detector.auto_fill(template_path, data, output_path)
+
+        result_doc = Document(str(output_path))
+        result_table = result_doc.tables[0]
+        assert "2021.07" in result_table.rows[2].cells[0].text
+        assert "测试公司" in result_table.rows[2].cells[1].text
+        assert "开发工程师" in result_table.rows[2].cells[2].text
+        assert "负责后端开发" in result_table.rows[2].cells[3].text
+
+    def test_fill_below_label(self, sample_resume, tmp_path):
+        """Test filling a cell below a label (not just right)."""
+        doc = Document()
+        table = doc.add_table(rows=2, cols=1)
+        table.style = "Table Grid"
+        table.rows[0].cells[0].text = "姓名"
+        # Row 1, col 0: blank (below the label)
+
+        template_path = tmp_path / "below_label.docx"
+        doc.save(str(template_path))
+
+        data = sample_resume.to_flat_dict()
+        detector = FieldDetector()
+        output_path = tmp_path / "filled_below.docx"
+        detector.auto_fill(template_path, data, output_path)
+
+        result_doc = Document(str(output_path))
+        result_table = result_doc.tables[0]
+        # The value should be in the cell below the label
+        assert "测试用户" in result_table.rows[1].cells[0].text
+
+    def test_fill_same_cell_with_colon(self, sample_resume, tmp_path):
+        """Test filling a cell that has 'label：' format (value in same cell)."""
+        doc = Document()
+        table = doc.add_table(rows=1, cols=2)
+        table.style = "Table Grid"
+        table.rows[0].cells[0].text = "姓名："
+        table.rows[0].cells[1].text = "电话："
+
+        template_path = tmp_path / "colon_label.docx"
+        doc.save(str(template_path))
+
+        data = sample_resume.to_flat_dict()
+        detector = FieldDetector()
+        output_path = tmp_path / "filled_colon.docx"
+        detector.auto_fill(template_path, data, output_path)
+
+        result_doc = Document(str(output_path))
+        result_table = result_doc.tables[0]
+        assert "测试用户" in result_table.rows[0].cells[0].text
+        assert "13900000000" in result_table.rows[0].cells[1].text
+
+    def test_multiple_sections_in_one_table(self, sample_resume, tmp_path):
+        """Test a table with multiple sections (education + work)."""
+        doc = Document()
+        table = doc.add_table(rows=5, cols=4)
+        table.style = "Table Grid"
+        # Education section
+        table.rows[0].cells[0].text = "教育经历"
+        table.rows[1].cells[0].text = "起止时间"
+        table.rows[1].cells[1].text = "院校"
+        table.rows[1].cells[2].text = "专业"
+        table.rows[1].cells[3].text = "学位"
+        # Row 2: blank for education data
+        # Work section
+        table.rows[3].cells[0].text = "工作经历"
+        table.rows[4].cells[0].text = "起止时间"
+        table.rows[4].cells[1].text = "单位"
+        table.rows[4].cells[2].text = "职务"
+        table.rows[4].cells[3].text = "描述"
+        # Row 2 is education data, but work has no blank row
+
+        template_path = tmp_path / "multi_section.docx"
+        doc.save(str(template_path))
+
+        data = sample_resume.to_flat_dict()
+        detector = FieldDetector()
+        output_path = tmp_path / "filled_multi.docx"
+        detector.auto_fill(template_path, data, output_path)
+
+        result_doc = Document(str(output_path))
+        result_table = result_doc.tables[0]
+        # Education data in row 2
+        assert "测试大学" in result_table.rows[2].cells[1].text
+        assert "计算机科学" in result_table.rows[2].cells[2].text
+
+    def test_section_detection_in_preview(self, tmp_path):
+        """Test that section headers are detected in preview_mapping."""
+        doc = Document()
+        table = doc.add_table(rows=3, cols=2)
+        table.style = "Table Grid"
+        table.rows[0].cells[0].text = "教育经历"
+        table.rows[1].cells[0].text = "院校"
+        table.rows[1].cells[1].text = "专业"
+
+        template_path = tmp_path / "preview_section.docx"
+        doc.save(str(template_path))
+
+        detector = FieldDetector()
+        previews = detector.preview_mapping(template_path)
+
+        # Should detect the education section
+        section_keys = [p["resume_key"] for p in previews]
+        assert any("education_section" in k for k in section_keys)
+
 
 # ──────────────────── Template Generator Tests ────────────────────
 

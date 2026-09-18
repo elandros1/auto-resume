@@ -2,6 +2,12 @@
 
 Automatically detects Chinese field labels in Word documents and maps them
 to resume data keys, so users don't have to manually mark placeholders.
+
+Upgraded features:
+- Table header recognition + column-to-field mapping
+- Multi-row batch filling for education/work/project sections
+- Multi-direction blank cell lookup (right / below / same cell)
+- Merged cell awareness
 """
 
 from __future__ import annotations
@@ -10,8 +16,12 @@ import re
 from pathlib import Path
 
 from docx import Document
+from docx.table import Table
+from docx.text.paragraph import Paragraph
 
-# Mapping from Chinese field labels (regex patterns) to resume keys
+# ──────────────────── Field Mapping Tables ────────────────────
+
+# Single-value field mappings: (regex_pattern, resume_key)
 FIELD_MAPPINGS: list[tuple[str, str]] = [
     # Basic info
     (r"姓\s*名", "name"),
@@ -26,35 +36,71 @@ FIELD_MAPPINGS: list[tuple[str, str]] = [
     (r"婚姻状况", "marital_status"),
     (r"通讯地址|联系地址|地址", "address"),
     (r"照片|相片", "photo_path"),
-
     # Job intent
     (r"求职意向|应聘岗位|期望岗位|意向岗位", "expected_position"),
     (r"期望薪资|期望薪酬|薪资要求", "expected_salary"),
     (r"期望城市|意向城市|期望工作地点", "expected_city"),
     (r"到岗时间|可入职时间", "availability"),
-
     # Self evaluation
     (r"自我评价|自我介绍|个人简介", "self_evaluation"),
-
-    # Education
+    # Summary fields (for paragraph-style templates)
     (r"毕业院校|学校名称|院校", "education_summary"),
-    (r"专\s*业", "education_1_major"),
-    (r"学\s*历|学位", "education_1_degree"),
-
-    # Work
-    (r"工作经历|工作经验", "work_experience_summary"),
-    (r"工作单位|单位名称", "work_1_company"),
-    (r"职\s*位|职务", "work_1_position"),
-
-    # Skills
     (r"专业技能|技能特长|技能", "skills_summary"),
     (r"证书|资格证书|职业证书", "certificates_summary"),
     (r"语言能力|外语水平|语言", "languages_summary"),
     (r"兴趣爱好|爱好|特长", "hobbies_summary"),
-
-    # Projects
-    (r"项目经验|项目经历", "projects_summary"),
 ]
+
+# Section header patterns: identify multi-row table sections
+# Maps section header regex -> data prefix used in flat dict
+# e.g. "education" prefix produces keys: education_1_school, education_1_major, etc.
+SECTION_PATTERNS: dict[str, str] = {
+    r"教育经历|学习经历|教育背景|学历背景": "education",
+    r"工作经历|工作经验|工作背景|职业经历": "work",
+    r"项目经验|项目经历|科研项目": "project",
+    r"发表论文|论文列表|学术成果": "publication",
+    r"获奖情况|荣誉奖项|获奖经历": "award",
+}
+
+# Column header patterns: map column header text to field suffix
+# For education section: "起止时间" -> combine start_date and end_date
+COLUMN_MAPPINGS: dict[str, dict[str, str]] = {
+    "education": {
+        r"起止时间|时间|起讫时间|在校时间": "date_range",
+        r"院校名称|学校名称|院校|毕业院校|学校": "school",
+        r"专\s*业": "major",
+        r"学\s*历|学位": "degree",
+        r"GPA|成绩": "gpa",
+        r"备注|说明|描述": "description",
+    },
+    "work": {
+        r"起止时间|时间|起讫时间|工作时间": "date_range",
+        r"工作单位|单位名称|单位|公司": "company",
+        r"职\s*位|职务|岗位": "position",
+        r"部门|院系": "department",
+        r"工作内容|职责|描述|备注": "description",
+    },
+    "project": {
+        r"起止时间|时间|项目时间": "date_range",
+        r"项目名称|名称": "name",
+        r"角\s*色|职务|承担工作": "role",
+        r"技术|技术栈|使用技术": "technologies",
+        r"描述|内容|备注": "description",
+    },
+    "publication": {
+        r"序号|编号": "index",
+        r"论文题目|题目|名称": "title",
+        r"期刊|发表刊物|杂志": "journal",
+        r"时间|日期|发表时间": "date",
+        r"作者|作者顺序": "authors",
+    },
+    "award": {
+        r"时间|日期|获奖时间": "date",
+        r"奖项名称|名称|获奖": "title",
+        r"级别|等级": "level",
+        r"颁发单位|授予单位": "issuer",
+    },
+}
 
 
 class FieldDetector:
@@ -62,13 +108,27 @@ class FieldDetector:
 
     def __init__(self, mappings: list[tuple[str, str]] | None = None):
         self.mappings = mappings or FIELD_MAPPINGS
-        self._compiled = [(re.compile(p, re.IGNORECASE), k) for p, k in self.mappings]
+        self._compiled = [
+            (re.compile(p, re.IGNORECASE), k) for p, k in self.mappings
+        ]
+        self._section_compiled = {
+            re.compile(p, re.IGNORECASE): prefix
+            for p, prefix in SECTION_PATTERNS.items()
+        }
+        self._column_compiled = {
+            prefix: [
+                (re.compile(p, re.IGNORECASE), suffix)
+                for p, suffix in cols.items()
+            ]
+            for prefix, cols in COLUMN_MAPPINGS.items()
+        }
+
+    # ──────────────────── Public API ────────────────────
 
     def detect_fields(self, doc_path: str | Path) -> dict[str, list[str]]:
         """Scan a Word document for recognizable field labels.
 
         Returns a dict: {resume_key: [list of cell/paragraph references]}
-        Each reference is "P:0" (paragraph index) or "T:0:R:1:C:2" (table, row, cell).
         """
         doc_path = Path(doc_path)
         doc = Document(str(doc_path))
@@ -82,9 +142,7 @@ class FieldDetector:
                 continue
             for pattern, key in self._compiled:
                 if pattern.search(text):
-                    if key not in results:
-                        results[key] = []
-                    results[key].append(f"P:{i}")
+                    results.setdefault(key, []).append(f"P:{i}")
 
         # Scan tables
         for t_idx, table in enumerate(doc.tables):
@@ -95,58 +153,57 @@ class FieldDetector:
                         continue
                     for pattern, key in self._compiled:
                         if pattern.search(text):
-                            if key not in results:
-                                results[key] = []
                             ref = f"T:{t_idx}:R:{r_idx}:C:{c_idx}"
-                            if ref not in results[key]:
+                            if ref not in results.setdefault(key, []):
                                 results[key].append(ref)
 
         return results
 
-    def get_blank_cells_near_labels(
-        self, doc_path: str | Path
-    ) -> dict[str, str]:
-        """Find blank cells next to label cells in tables.
-
-        When a table cell contains a label like "姓名", the adjacent cell
-        is usually where the value should go.
-
-        Returns: {resume_key: cell_reference}
-        """
+    def preview_mapping(self, doc_path: str | Path) -> list[dict[str, str]]:
+        """Preview what fields would be detected and mapped."""
         doc_path = Path(doc_path)
         doc = Document(str(doc_path))
 
-        results: dict[str, str] = {}
+        previews: list[dict[str, str]] = []
 
+        # Scan paragraphs
+        for i, para in enumerate(doc.paragraphs):
+            text = para.text.strip()
+            for pattern, key in self._compiled:
+                if pattern.search(text):
+                    previews.append({
+                        "label": text[:50],
+                        "resume_key": key,
+                        "location": f"段落 {i}",
+                    })
+
+        # Scan tables — include section header detection
         for t_idx, table in enumerate(doc.tables):
             for r_idx, row in enumerate(table.rows):
-                cells = row.cells
-                for c_idx, cell in enumerate(cells):
+                for c_idx, cell in enumerate(row.cells):
                     text = cell.text.strip()
                     if not text:
                         continue
 
+                    # Check section headers
+                    for pattern, prefix in self._section_compiled.items():
+                        if pattern.search(text):
+                            previews.append({
+                                "label": text[:50],
+                                "resume_key": f"{prefix}_section",
+                                "location": f"表格{t_idx} 行{r_idx} 列{c_idx}",
+                            })
+
+                    # Check individual field labels
                     for pattern, key in self._compiled:
                         if pattern.search(text):
-                            # Look for adjacent blank cell (right side)
-                            if c_idx + 1 < len(cells):
-                                next_cell = cells[c_idx + 1]
-                                if not next_cell.text.strip():
-                                    ref = f"T:{t_idx}:R:{r_idx}:C:{c_idx + 1}"
-                                    if key not in results:
-                                        results[key] = ref
-                                    break
+                            previews.append({
+                                "label": text[:50],
+                                "resume_key": key,
+                                "location": f"表格{t_idx} 行{r_idx} 列{c_idx}",
+                            })
 
-                            # Also check if label and blank are merged
-                            # (label:text: format in same cell)
-                            elif ":" in text or "：" in text:
-                                # Label cell itself has space for value
-                                ref = f"T:{t_idx}:R:{r_idx}:C:{c_idx}"
-                                if key not in results:
-                                    results[key] = ref
-                                break
-
-        return results
+        return previews
 
     def auto_fill(
         self,
@@ -156,8 +213,10 @@ class FieldDetector:
     ) -> Path:
         """Auto-fill a Word document by detecting fields and filling values.
 
-        This is the smart mode: it scans the document for Chinese labels,
-        finds the blank cells next to them, and fills in the values.
+        Strategy (in order):
+        1. Fill {{placeholder}} and ${placeholder} style markers
+        2. Detect multi-row sections (education/work/projects) and fill by column
+        3. Smart-detect single-value label cells and fill adjacent blanks
 
         Args:
             doc_path: Path to the original Word document.
@@ -171,52 +230,35 @@ class FieldDetector:
         output_path = Path(output_path)
         doc = Document(str(doc_path))
 
-        # First: fill existing {{placeholder}} style markers
+        # Phase 1: Fill placeholder markers
+        self._fill_all_placeholders(doc, data)
+
+        # Phase 2: Detect and fill multi-row sections
+        self._fill_section_tables(doc, data)
+
+        # Phase 3: Smart-detect remaining single-value labels
+        self._fill_single_value_labels(doc, data)
+
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        doc.save(str(output_path))
+        return output_path
+
+    # ──────────────────── Phase 1: Placeholders ────────────────────
+
+    def _fill_all_placeholders(self, doc: Document, data: dict[str, str]) -> None:
+        """Fill {{placeholder}} and ${placeholder} style markers everywhere."""
         for para in doc.paragraphs:
             self._fill_placeholders_in_paragraph(para, data)
+
         for table in doc.tables:
             for row in table.rows:
                 for cell in row.cells:
                     for para in cell.paragraphs:
                         self._fill_placeholders_in_paragraph(para, data)
 
-        # Second: smart-detect label cells and fill adjacent blanks
-        filled_count = 0
-        for t_idx, table in enumerate(doc.tables):
-            for r_idx, row in enumerate(table.rows):
-                cells = row.cells
-                for c_idx, cell in enumerate(cells):
-                    text = cell.text.strip()
-
-                    # Skip cells that already have content (already filled or not a label)
-                    # Check if this is a label cell with a blank neighbor
-                    for pattern, key in self._compiled:
-                        if pattern.search(text):
-                            value = data.get(key, "")
-                            if not value:
-                                continue
-
-                            # Try adjacent right cell
-                            if c_idx + 1 < len(cells):
-                                next_cell = cells[c_idx + 1]
-                                if not next_cell.text.strip():
-                                    self._set_cell_text(next_cell, value)
-                                    filled_count += 1
-                                    break
-
-                            # Try the same cell if it has "label:___" format
-                            # Replace trailing colons/underscores with value
-                            elif text.endswith(":") or text.endswith("："):
-                                new_text = text + " " + value
-                                self._set_cell_text(cell, new_text)
-                                filled_count += 1
-                                break
-
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-        doc.save(str(output_path))
-        return output_path
-
-    def _fill_placeholders_in_paragraph(self, para, data: dict[str, str]) -> None:
+    def _fill_placeholders_in_paragraph(
+        self, para: Paragraph, data: dict[str, str]
+    ) -> None:
         """Fill {{placeholder}} style markers in a paragraph."""
         text = para.text
         if "{{" not in text and "${" not in text:
@@ -237,6 +279,301 @@ class FieldDetector:
             for run in para.runs[1:]:
                 run.text = ""
 
+    # ──────────────────── Phase 2: Section Tables ────────────────────
+
+    def _fill_section_tables(self, doc: Document, data: dict[str, str]) -> None:
+        """Detect multi-row section tables and fill them by column mapping.
+
+        This handles tables like:
+        | 教育经历 (merged header) |
+        | 起止时间 | 院校名称 | 专业 | 学位 |
+        | (blank)  | (blank)  | (blank) | (blank) |
+        | (blank)  | (blank)  | (blank) | (blank) |
+
+        The blank rows are filled with education_1_*, education_2_*, etc.
+        """
+        for table in doc.tables:
+            self._process_single_table_sections(table, data)
+
+    def _process_single_table(self, table: Table, data: dict[str, str]) -> None:
+        """Process a single table for section detection and filling."""
+        # First: detect if any cell is a section header
+        section_prefix = None
+        header_row_idx = None
+
+        for r_idx, row in enumerate(table.rows):
+            row_text = " ".join(cell.text.strip() for cell in row.cells).strip()
+            for pattern, prefix in self._section_compiled.items():
+                if pattern.search(row_text):
+                    section_prefix = prefix
+                    header_row_idx = r_idx
+                    break
+            if section_prefix:
+                break
+
+        if not section_prefix:
+            return
+
+        # Find the column header row (usually the row after the section header)
+        col_header_row_idx = header_row_idx + 1
+        if col_header_row_idx >= len(table.rows):
+            return
+
+        col_header_row = table.rows[col_header_row_idx]
+        column_map = self._detect_column_mappings(col_header_row, section_prefix)
+
+        if not column_map:
+            # Maybe the section header row IS the column header row
+            # Try the header row itself
+            column_map = self._detect_column_mappings(
+                table.rows[header_row_idx], section_prefix
+            )
+            if column_map:
+                col_header_row_idx = header_row_idx
+            else:
+                return
+
+        # Fill data rows (everything after the column header row)
+        data_count = int(data.get(f"{section_prefix}_count", "0"))
+        if data_count == 0:
+            return
+
+        for entry_idx in range(1, data_count + 1):
+            target_row_idx = col_header_row_idx + entry_idx
+            if target_row_idx >= len(table.rows):
+                # Table doesn't have enough rows — skip extra entries
+                break
+
+            row = table.rows[target_row_idx]
+            self._fill_row_by_column_map(row, column_map, section_prefix, entry_idx, data)
+
+    def _process_single_table_sections(
+        self, table: Table, data: dict[str, str]
+    ) -> None:
+        """Process a table, handling both section-header and non-section tables."""
+        # Detect section headers anywhere in the table
+        section_locations: list[tuple[int, str]] = []
+
+        for r_idx, row in enumerate(table.rows):
+            row_text = " ".join(cell.text.strip() for cell in row.cells).strip()
+            for pattern, prefix in self._section_compiled.items():
+                if pattern.search(row_text):
+                    section_locations.append((r_idx, prefix))
+                    break
+
+        if not section_locations:
+            return
+
+        for header_r_idx, prefix in section_locations:
+            self._fill_one_section(table, header_r_idx, prefix, data)
+
+    def _fill_one_section(
+        self,
+        table: Table,
+        header_r_idx: int,
+        prefix: str,
+        data: dict[str, str],
+    ) -> None:
+        """Fill one section within a table, starting at the given header row."""
+
+        # Find the column header row
+        col_header_r_idx = header_r_idx + 1
+        if col_header_r_idx >= len(table.rows):
+            # Maybe header row itself has column labels
+            col_header_r_idx = header_r_idx
+            column_map = self._detect_column_mappings(
+                table.rows[col_header_r_idx], prefix
+            )
+        else:
+            column_map = self._detect_column_mappings(
+                table.rows[col_header_r_idx], prefix
+            )
+            if not column_map:
+                # Try the header row itself
+                col_header_r_idx = header_r_idx
+                column_map = self._detect_column_mappings(
+                    table.rows[col_header_r_idx], prefix
+                )
+
+        if not column_map:
+            return
+
+        # Determine how many entries to fill
+        # Handle inconsistent count key naming: work_experience_count vs work_count
+        count_key = f"{prefix}_count"
+        if prefix == "work":
+            count_key = "work_experience_count"
+        data_count = int(data.get(count_key, "0"))
+        if data_count == 0:
+            return
+
+        # Fill data rows after the column header row
+        # If header row == column header row, data starts at header_r_idx + 1
+        # Otherwise data starts at col_header_r_idx + 1
+        data_start_r_idx = col_header_r_idx + 1
+
+        # Don't fill into the next section's rows
+        next_section_r_idx = len(table.rows)  # default: end of table
+        for r_idx in range(data_start_r_idx, len(table.rows)):
+            row_text = " ".join(
+                cell.text.strip() for cell in table.rows[r_idx].cells
+            ).strip()
+            for pattern, other_prefix in self._section_compiled.items():
+                if pattern.search(row_text) and other_prefix != prefix:
+                    next_section_r_idx = r_idx
+                    break
+
+        available_rows = next_section_r_idx - data_start_r_idx
+
+        for entry_idx in range(1, min(data_count, available_rows) + 1):
+            target_r_idx = data_start_r_idx + entry_idx - 1
+            row = table.rows[target_r_idx]
+            self._fill_row_by_column_map(
+                row, column_map, prefix, entry_idx, data
+            )
+
+    def _detect_column_mappings(
+        self, row, prefix: str
+    ) -> dict[int, str]:
+        """Detect which column maps to which field suffix.
+
+        Returns: {col_index: field_suffix}
+        e.g. {0: "date_range", 1: "school", 2: "major", 3: "degree"}
+        """
+        col_patterns = self._column_compiled.get(prefix, [])
+        if not col_patterns:
+            return {}
+
+        column_map: dict[int, str] = {}
+
+        for c_idx, cell in enumerate(row.cells):
+            text = cell.text.strip()
+            if not text:
+                continue
+            for pattern, suffix in col_patterns:
+                if pattern.search(text):
+                    # Don't overwrite if already mapped (merged cells)
+                    if c_idx not in column_map:
+                        column_map[c_idx] = suffix
+                    break
+
+        return column_map
+
+    def _fill_row_by_column_map(
+        self,
+        row,
+        column_map: dict[int, str],
+        prefix: str,
+        entry_idx: int,
+        data: dict[str, str],
+    ) -> None:
+        """Fill a single row based on the column mapping.
+
+        For each column, look up the corresponding field value:
+        - "date_range" -> combine {prefix}_{idx}_start_date and _end_date
+        - Other suffixes -> {prefix}_{idx}_{suffix}
+        """
+        for c_idx, suffix in column_map.items():
+            if c_idx >= len(row.cells):
+                continue
+
+            cell = row.cells[c_idx]
+
+            # Skip cells that already have content (don't overwrite)
+            if cell.text.strip():
+                continue
+
+            if suffix == "date_range":
+                start = data.get(f"{prefix}_{entry_idx}_start_date", "")
+                end = data.get(f"{prefix}_{entry_idx}_end_date", "")
+                value = f"{start} - {end}" if start and end else f"{start}{end}"
+            elif suffix == "index":
+                value = str(entry_idx)
+            else:
+                value = data.get(f"{prefix}_{entry_idx}_{suffix}", "")
+
+            if value:
+                self._set_cell_text(cell, value)
+
+    # ──────────────────── Phase 3: Single-Value Labels ────────────────────
+
+    def _fill_single_value_labels(self, doc: Document, data: dict[str, str]) -> None:
+        """Smart-detect label cells and fill adjacent blanks (multi-direction)."""
+        for table in doc.tables:
+            for r_idx, row in enumerate(table.rows):
+                cells = row.cells
+                for c_idx, cell in enumerate(cells):
+                    text = cell.text.strip()
+                    if not text:
+                        continue
+
+                    for pattern, key in self._compiled:
+                        if not pattern.search(text):
+                            continue
+
+                        value = data.get(key, "")
+                        if not value:
+                            continue
+
+                        # Skip if already filled (section filler may have done it)
+                        if value and value in cell.text:
+                            break
+
+                        # Strategy 1: Adjacent right cell
+                        if c_idx + 1 < len(cells):
+                            next_cell = cells[c_idx + 1]
+                            if not next_cell.text.strip():
+                                self._set_cell_text(next_cell, value)
+                                break
+
+                        # Strategy 2: Cell below (next row, same column)
+                        if r_idx + 1 < len(table.rows):
+                            below_cell = table.rows[r_idx + 1].cells[c_idx]
+                            if not below_cell.text.strip():
+                                self._set_cell_text(below_cell, value)
+                                break
+
+                        # Strategy 3: Same cell with "label:___" format
+                        if text.endswith(":") or text.endswith("："):
+                            new_text = text + " " + value
+                            self._set_cell_text(cell, new_text)
+                            break
+
+                        # Strategy 4: Same cell with "label：" + empty space
+                        if "：" in text or ":" in text:
+                            # Replace trailing colons/underscores
+                            new_text = re.sub(
+                                r"[:：]\s*$", f"：{value}", text
+                            )
+                            if new_text != text:
+                                self._set_cell_text(cell, new_text)
+                                break
+
+        # Also fill paragraph-based labels (label: value format)
+        for para in doc.paragraphs:
+            text = para.text.strip()
+            if not text:
+                continue
+            for pattern, key in self._compiled:
+                if pattern.search(text):
+                    value = data.get(key, "")
+                    if not value:
+                        continue
+                    # Check if text is just the label (no value yet)
+                    # e.g., "姓名：" with nothing after
+                    match = re.match(
+                        r"^(.*?[:：])\s*$", text
+                    )
+                    if match and not text[len(match.group(1)):].strip():
+                        prefix_label = match.group(1)
+                        if para.runs:
+                            para.runs[0].text = f"{prefix_label} {value}"
+                            for run in para.runs[1:]:
+                                run.text = ""
+                        break
+
+    # ──────────────────── Utility Methods ────────────────────
+
     def _set_cell_text(self, cell, text: str) -> None:
         """Set text in a table cell, preserving first paragraph formatting."""
         if cell.paragraphs:
@@ -244,7 +581,9 @@ class FieldDetector:
             if para.runs:
                 para.runs[0].text = text
             else:
-                para.add_run(text)
+                run = para.add_run(text)
+                # Try to copy formatting from adjacent cell's run
+                run.font.size = None  # inherit
             # Clear extra paragraphs
             for extra in cell.paragraphs[1:]:
                 for run in extra.runs:
@@ -252,41 +591,26 @@ class FieldDetector:
         else:
             cell.text = text
 
-    def preview_mapping(
-        self, doc_path: str | Path
-    ) -> list[dict[str, str]]:
-        """Preview what fields would be detected and mapped.
+    def _find_blank_cell_multi_direction(
+        self, table: Table, r_idx: int, c_idx: int
+    ) -> str | None:
+        """Find a blank cell near (r_idx, c_idx) in multiple directions.
 
-        Returns a list of dicts with: label, resume_key, location
-        Useful for showing the user what will be auto-filled.
+        Returns the cell reference string, or None if no blank found.
+        Priority: right > below > same-cell-with-colon.
         """
-        doc_path = Path(doc_path)
-        doc = Document(str(doc_path))
+        cells = table.rows[r_idx].cells
 
-        previews: list[dict[str, str]] = []
+        # Right
+        if c_idx + 1 < len(cells):
+            next_cell = cells[c_idx + 1]
+            if not next_cell.text.strip():
+                return f"R:{r_idx}C:{c_idx + 1}"
 
-        # Scan paragraphs
-        for i, para in enumerate(doc.paragraphs):
-            text = para.text.strip()
-            for pattern, key in self._compiled:
-                if pattern.search(text):
-                    previews.append({
-                        "label": text[:50],
-                        "resume_key": key,
-                        "location": f"段落 {i}",
-                    })
+        # Below
+        if r_idx + 1 < len(table.rows):
+            below_cell = table.rows[r_idx + 1].cells[c_idx]
+            if not below_cell.text.strip():
+                return f"R:{r_idx + 1}C:{c_idx}"
 
-        # Scan tables
-        for t_idx, table in enumerate(doc.tables):
-            for r_idx, row in enumerate(table.rows):
-                for c_idx, cell in enumerate(row.cells):
-                    text = cell.text.strip()
-                    for pattern, key in self._compiled:
-                        if pattern.search(text):
-                            previews.append({
-                                "label": text[:50],
-                                "resume_key": key,
-                                "location": f"表格{t_idx} 行{r_idx} 列{c_idx}",
-                            })
-
-        return previews
+        return None
