@@ -10,6 +10,7 @@ from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.table import Table as RichTable
 
+from . import get_resource_path
 from .detector import FieldDetector
 from .engine import TemplateEngine
 from .models import ResumeData
@@ -66,7 +67,7 @@ def fill(resume_path, template_path, templates_dir, output_dir, smart):
 
     if not templates_dir and not template_path:
         # Use built-in templates
-        templates_dir = str(Path(__file__).parent / "templates")
+        templates_dir = str(get_resource_path("templates"))
         if not Path(templates_dir).exists():
             console.print("[yellow]未指定模板，正在生成内置模板...[/yellow]")
             generate_all_templates(templates_dir)

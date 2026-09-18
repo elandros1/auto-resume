@@ -59,28 +59,9 @@ jobs:
           name: auto-resume-${{ runner.os }}
           path: dist/auto-resume*
 
-  build-python-zip:
-    name: Build .pyz (portable Python)
-    needs: test
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-      - run: pip install -e .
-      - run: pip install zipapp
-      - name: Create .pyz
-        run: |
-          python -m zipapp src/auto_resume -o dist/auto-resume.pyz -m "__main__:cli"
-      - uses: actions/upload-artifact@v4
-        with:
-          name: auto-resume-pyz
-          path: dist/auto-resume.pyz
-
   release:
     name: Create GitHub Release
-    needs: [build-binaries, build-python-zip]
+    needs: [build-binaries]
     runs-on: ubuntu-latest
     permissions:
       contents: write
