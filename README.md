@@ -16,12 +16,35 @@ Auto-Resume 让你：
 3. 工具**自动识别**表中的"姓名""电话"等中文标签并填充
 4. 一键生成填好的文件
 
+## 安装
+
+三种方式，任选一种：
+
+### 方式一：一键安装（推荐）
+
+**Linux / macOS:**
+```bash
+curl -fsSL https://raw.githubusercontent.com/elandros1/auto-resume/main/install.sh | bash
+```
+
+**Windows:**
+```cmd
+curl -fsSL https://raw.githubusercontent.com/elandros1/auto-resume/main/install.bat | cmd
+```
+
+### 方式二：pip 从 GitHub 安装
+
+```bash
+pip install git+https://github.com/elandros1/auto-resume.git
+```
+
+### 方式三：下载可执行文件
+
+到 [Releases 页面](https://github.com/elandros1/auto-resume/releases) 下载对应平台的可执行文件，无需安装 Python。
+
 ## 快速开始
 
 ```bash
-# 安装
-pip install -e .
-
 # 创建你的简历数据文件
 auto-resume new my_resume.json
 

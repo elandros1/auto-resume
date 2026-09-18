@@ -1,4 +1,4 @@
-name: Release
+name: Build Release Assets
 
 on:
   push:
@@ -7,24 +7,80 @@ on:
 
 jobs:
   test:
-    name: Run tests before release
+    name: Run tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+      - run: pip install -e ".[dev]"
+      - run: pytest -v --tb=short
+      - run: ruff check src/ tests/
+
+  build-binaries:
+    name: Build standalone executables
+    needs: test
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
       - name: Install dependencies
-        run: pip install -e ".[dev]"
-      - name: Run tests
-        run: pytest -v --tb=short
-      - name: Lint check
-        run: ruff check src/ tests/
+        run: |
+          pip install pyinstaller
+          pip install -e .
+
+      - name: Build executable (Linux/macOS)
+        if: runner.os != 'Windows'
+        run: |
+          pyinstaller --onefile --name auto-resume \
+            --add-data "src/auto_resume/templates:auto_resume/templates" \
+            --add-data "src/auto_resume/samples:auto_resume/samples" \
+            src/auto_resume/__main__.py
+
+      - name: Build executable (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          pyinstaller --onefile --name auto-resume `
+            --add-data "src/auto_resume/templates;auto_resume/templates" `
+            --add-data "src/auto_resume/samples;auto_resume/samples" `
+            src/auto_resume/__main__.py
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: auto-resume-${{ runner.os }}
+          path: dist/auto-resume*
+
+  build-python-zip:
+    name: Build .pyz (portable Python)
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -e .
+      - run: pip install zipapp
+      - name: Create .pyz
+        run: |
+          python -m zipapp src/auto_resume -o dist/auto-resume.pyz -m "__main__:cli"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: auto-resume-pyz
+          path: dist/auto-resume.pyz
 
   release:
     name: Create GitHub Release
-    needs: test
+    needs: [build-binaries, build-python-zip]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -37,6 +93,12 @@ jobs:
         id: version
         run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
 
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist/
+          merge-matching: true
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -44,3 +106,6 @@ jobs:
           name: ${{ steps.version.outputs.VERSION }}
           draft: false
           prerelease: false
+          files: |
+            dist/*
+            dist/**/*
