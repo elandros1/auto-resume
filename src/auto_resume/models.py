@@ -287,6 +287,10 @@ class ResumeData:
     education_duration: str = ""      # 学制
     graduation_date: str = ""         # 毕业时间
     awards_summary: str = ""          # 个人主要荣誉及获奖
+    education_summary: str = ""       # 教育经历概述
+    work_experience_summary: str = ""  # 工作经历概述
+    skills_summary: str = ""          # 专业技能概述
+    certificates_summary: str = ""    # 证书概述
 
     # ── Lists (multi-entry) ──
     education: list[Education] = field(default_factory=list)
@@ -345,33 +349,154 @@ class ResumeData:
             "awards_punishments", "disciplinary_record",
             "childbearing_status", "is_fresh_graduate",
             "signature", "education_duration", "graduation_date",
-            "awards_summary",
+            "awards_summary", "education_summary", "work_experience_summary",
+            "skills_summary", "certificates_summary",
         ]
         for f in simple_fields:
             if f in data:
                 setattr(resume, f, str(data[f]))
 
-        # List/object fields
+        # List/object fields — gracefully handle strings and lists
         if "education" in data:
-            resume.education = [Education(**e) for e in data["education"]]
+            val = data["education"]
+            if isinstance(val, list):
+                resume.education = [
+                    Education(**e) if isinstance(e, dict) else Education()
+                    for e in val
+                ]
         if "work_experience" in data:
-            resume.work_experience = [WorkExperience(**w) for w in data["work_experience"]]
+            val = data["work_experience"]
+            if isinstance(val, list):
+                resume.work_experience = [
+                    WorkExperience(**w) if isinstance(w, dict) else WorkExperience()
+                    for w in val
+                ]
         if "projects" in data:
-            resume.projects = [Project(**p) for p in data["projects"]]
+            val = data["projects"]
+            if isinstance(val, list):
+                resume.projects = [
+                    Project(**p) if isinstance(p, dict) else Project()
+                    for p in val
+                ]
         if "publications" in data:
-            resume.publications = [Publication(**p) for p in data["publications"]]
+            val = data["publications"]
+            if isinstance(val, list):
+                resume.publications = [
+                    Publication(**p) if isinstance(p, dict) else Publication()
+                    for p in val
+                ]
         if "awards" in data:
-            resume.awards = [Award(**a) for a in data["awards"]]
+            val = data["awards"]
+            if isinstance(val, list):
+                resume.awards = [
+                    Award(**a) if isinstance(a, dict) else Award(title=str(a))
+                    for a in val
+                ]
+            elif isinstance(val, str):
+                resume.awards_summary = val
         if "family_members" in data:
-            resume.family_members = [FamilyMember(**f) for f in data["family_members"]]
+            val = data["family_members"]
+            if isinstance(val, list):
+                resume.family_members = [
+                    FamilyMember(**f) if isinstance(f, dict) else FamilyMember()
+                    for f in val
+                ]
         if "skills" in data:
-            resume.skills = [Skill(**s) for s in data["skills"]]
+            val = data["skills"]
+            if isinstance(val, list):
+                resume.skills = [
+                    Skill(**s) if isinstance(s, dict) else Skill(name=str(s))
+                    for s in val
+                ]
         if "certificates" in data:
-            resume.certificates = list(data["certificates"])
+            val = data["certificates"]
+            if isinstance(val, list):
+                resume.certificates = [str(c) for c in val]
+            elif isinstance(val, str):
+                resume.certificates = [val]
         if "languages" in data:
-            resume.languages = list(data["languages"])
+            val = data["languages"]
+            if isinstance(val, list):
+                resume.languages = [str(lang) for lang in val]
+            elif isinstance(val, str):
+                resume.languages = [val]
         if "hobbies" in data:
-            resume.hobbies = list(data["hobbies"])
+            val = data["hobbies"]
+            if isinstance(val, list):
+                resume.hobbies = [str(h) for h in val]
+            elif isinstance(val, str):
+                resume.hobbies = [val]
+
+        # ── Flat education keys: education_1_school, education_1_start, etc. ──
+        # Supports both list format and flat key format in the same JSON
+        for i in range(1, 6):
+            prefix = f"education_{i}_"
+            flat_data = {
+                k.replace(prefix, "").replace("start", "start_date").replace(
+                    "end", "end_date"
+                ).replace("level", "education_level").replace(
+                    "form", "education_form"
+                ): v
+                for k, v in data.items()
+                if k.startswith(prefix)
+            }
+            if flat_data and any(flat_data.values()):
+                # Only add if we don't already have this index from list format
+                if len(resume.education) < i:
+                    while len(resume.education) < i - 1:
+                        resume.education.append(Education())
+                    resume.education.append(Education(**flat_data))
+                else:
+                    # Update existing entry with flat keys
+                    edu = resume.education[i - 1]
+                    for k, v in flat_data.items():
+                        if v and hasattr(edu, k):
+                            setattr(edu, k, v)
+
+        # ── Flat work keys: work_1_unit, work_1_position, etc. ──
+        for i in range(1, 6):
+            prefix = f"work_{i}_"
+            flat_data: dict[str, str] = {}
+            for k, v in data.items():
+                if k.startswith(prefix):
+                    field = k.replace(prefix, "")
+                    # Map flat key names to WorkExperience attribute names
+                    # Order matters: longer patterns first
+                    field = field.replace("unit", "company").replace(
+                        "start", "start_date"
+                    ).replace("end", "end_date").replace(
+                        "witness_phone", "reference_phone"
+                    ).replace("witness", "reference_person")
+                    flat_data[field] = v
+            if flat_data and any(flat_data.values()):
+                if len(resume.work_experience) < i:
+                    while len(resume.work_experience) < i - 1:
+                        resume.work_experience.append(WorkExperience())
+                    resume.work_experience.append(WorkExperience(**flat_data))
+                else:
+                    work = resume.work_experience[i - 1]
+                    for k, v in flat_data.items():
+                        if v and hasattr(work, k):
+                            setattr(work, k, v)
+
+        # ── Flat family member keys: family_1_name, family_1_phone, etc. ──
+        for i in range(1, 6):
+            prefix = f"family_{i}_"
+            flat_data = {}
+            for k, v in data.items():
+                if k.startswith(prefix):
+                    field = k.replace(prefix, "")
+                    flat_data[field] = v
+            if flat_data and any(flat_data.values()):
+                if len(resume.family_members) < i:
+                    while len(resume.family_members) < i - 1:
+                        resume.family_members.append(FamilyMember())
+                    resume.family_members.append(FamilyMember(**flat_data))
+                else:
+                    fam = resume.family_members[i - 1]
+                    for k, v in flat_data.items():
+                        if v and hasattr(fam, k):
+                            setattr(fam, k, v)
 
         return resume
 
@@ -423,7 +548,8 @@ class ResumeData:
             "awards_punishments", "disciplinary_record",
             "childbearing_status", "is_fresh_graduate",
             "signature", "education_duration", "graduation_date",
-            "awards_summary",
+            "awards_summary", "education_summary", "work_experience_summary",
+            "skills_summary", "certificates_summary",
         ]
 
         for f in simple_fields:
@@ -431,7 +557,8 @@ class ResumeData:
 
         # ── Education ──
         d["education_count"] = str(len(self.education))
-        d["education_summary"] = "\n".join(e.to_text() for e in self.education)
+        edu_summary = "\n".join(e.to_text() for e in self.education)
+        d["education_summary"] = edu_summary or self.education_summary
         for i, edu in enumerate(self.education, 1):
             d[f"education_{i}_school"] = edu.school
             d[f"education_{i}_major"] = edu.major
@@ -449,7 +576,8 @@ class ResumeData:
 
         # ── Work experience ──
         d["work_experience_count"] = str(len(self.work_experience))
-        d["work_experience_summary"] = "\n".join(w.to_text() for w in self.work_experience)
+        work_summary = "\n".join(w.to_text() for w in self.work_experience)
+        d["work_experience_summary"] = work_summary or self.work_experience_summary
         for i, work in enumerate(self.work_experience, 1):
             d[f"work_{i}_company"] = work.company
             d[f"work_{i}_position"] = work.position
@@ -514,16 +642,18 @@ class ResumeData:
 
         # ── Skills ──
         d["skills_count"] = str(len(self.skills))
-        d["skills_summary"] = "\n".join(
+        skills_sum = "\n".join(
             f"{s.category}: {s.items}" for s in self.skills
         )
+        d["skills_summary"] = skills_sum or self.skills_summary
         for i, skill in enumerate(self.skills, 1):
             d[f"skill_{i}_category"] = skill.category
             d[f"skill_{i}_items"] = skill.items
 
         # ── Certificates ──
         d["certificates_count"] = str(len(self.certificates))
-        d["certificates_summary"] = "、".join(self.certificates)
+        certs_sum = "、".join(self.certificates)
+        d["certificates_summary"] = certs_sum or self.certificates_summary
         for i, cert in enumerate(self.certificates, 1):
             d[f"certificate_{i}"] = cert
 

@@ -60,6 +60,9 @@ FIELD_MAPPINGS: list[tuple[str, str]] = [
     (r"职称/职业资格证|专业职称|职业资格|职业资格证书|专业技术资格", "professional_certificate"),
     (r"职务职称|职\s*称", "professional_title"),
     (r"社会经历|社会实践", "social_experience"),
+    # Section headers as single-value fallback (when no multi-row table)
+    (r"教育背景|教育经历|学习\s*经历|学历背景|学习简历|教育情况", "education_summary"),
+    (r"工作经历|工作背景|工作简历|工作情况", "work_experience_summary"),
     (r"所学专业", "education_1_major"),
     (r"毕业学校", "education_summary"),
     (r"毕业时间", "graduation_date"),
@@ -139,6 +142,8 @@ FIELD_FALLBACKS: dict[str, list[str]] = {
     "highest_degree": ["education_1_education_level"],
     "graduation_date": ["education_1_end_date"],
     "education_summary": ["education_1_school"],
+    "education_section": ["education_summary", "education_1_school"],
+    "work_section": ["work_experience_summary", "work_1_company"],
     "previous_employer": ["work_1_company"],
     "professional_title": ["work_1_professional_title"],
 }
@@ -899,6 +904,11 @@ class FieldDetector:
                 for c_idx, cell in enumerate(cells):
                     text = cell.text.strip()
                     if not text:
+                        continue
+
+                    # Skip cells that look like filled data, not labels
+                    # Labels are short (≤15 chars), no newlines/pipes
+                    if len(text) > 15 or "\n" in text or "|" in text:
                         continue
 
                     # Skip cells that are vertical merge continuations
