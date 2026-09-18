@@ -22,14 +22,14 @@ Auto-Resume 让你：
 
 ### 方式一：一键安装（推荐）
 
-**Linux / macOS:**
-```bash
-curl -fsSL https://raw.githubusercontent.com/elandros1/auto-resume/main/install.sh | bash
+**Windows (PowerShell):**
+```powershell
+curl -fsSL https://raw.githubusercontent.com/elandros1/auto-resume/main/install.bat -o install.bat && cmd /c install.bat && del install.bat
 ```
 
-**Windows:**
-```cmd
-curl -fsSL https://raw.githubusercontent.com/elandros1/auto-resume/main/install.bat | cmd
+**Mac/Linux:**
+```bash
+curl -fsSL https://raw.githubusercontent.com/elandros1/auto-resume/main/install.sh | bash
 ```
 
 ### 方式二：pip 从 GitHub 安装
