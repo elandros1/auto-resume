@@ -22,56 +22,69 @@ from docx.text.paragraph import Paragraph
 # ──────────────────── Field Mapping Tables ────────────────────
 
 # Single-value field mappings: (regex_pattern, resume_key)
+# IMPORTANT: More specific patterns MUST come before generic ones
+# to avoid false matches (e.g. "证明人电话" before "证明人", "紧急联系人" before "联系人")
 FIELD_MAPPINGS: list[tuple[str, str]] = [
     # ── Basic personal info ──
     (r"姓\s*名", "name"),
     (r"性\s*别", "gender"),
-    (r"出生年月|出生日期|生日", "birth_date"),
+    (r"出生年月|出生日期|生日|出生时间", "birth_date"),
     (r"年\s*龄", "age"),
-    (r"联系电话|联系方式|手机|电话|联络电话|移动电话", "phone"),
+    # phone: 联系方式/联系电话/电话 — context-aware for emergency contact
+    (r"联系电话|联系方式|手机|联络电话|移动电话|手机号码|电\s*话", "phone"),
     (r"电子邮箱|邮箱|Email|E-mail|电子邮件|电子信箱|Email地址", "email"),
     (r"籍\s*贯|籍贯地|出生地|生源地|原籍", "hometown"),
-    (r"政治面貌|党派|政治面貌", "political_status"),
+    (r"政治面貌|党派", "political_status"),
     (r"身份证号|证件号码|身份证号码|身份证明|身份证", "id_number"),
     (r"民\s*族|族\s*别", "nationality"),
     (r"婚姻状况|是否已婚|婚否|婚\s*姻", "marital_status"),
-    (r"通讯地址|联系地址|地址|住址|家庭住址|现住址|居住地", "address"),
-    (r"邮\s*编|邮政编码|邮编代码|邮政编码", "postal_code"),
-    (r"户口所在地|户籍地|户口|户籍所在地|户口所在", "hukou_location"),
+    # address: 现通讯地址 before 户籍地址, both before generic 地址
+    (r"现通讯地址|通讯地址|联系地址|家庭住址|现住址|居住地|住\s*址", "address"),
+    (r"现户籍地址|户口所在地|户籍地|户籍所在地|户口所在|户\s*口", "hukou_location"),
+    (r"邮\s*编|邮政编码|邮编代码", "postal_code"),
     (r"身\s*高|身高cm|身高CM", "height"),
     (r"视\s*力|眼睛度数", "vision"),
     (r"照片|相片", "photo_path"),
-    # ── Professional info ──
-    (r"专业特长|特长", "specialty"),
+    # ── Professional info (specific before generic) ──
+    (r"学术专长|专业特长|专长|特长", "specialty"),
+    (r"技能爱好|技能特长|专业技能|技\s*能", "skills_summary"),
     (r"计算机熟练程度|计算机水平|计算机能力", "computer_proficiency"),
-    (r"外语熟练程度|外语水平|外语能力|外语程度", "foreign_language"),
+    (r"外语等级|外语熟练程度|外语水平|外语能力|外语程度", "foreign_language"),
     (r"原单位|原工作单位", "previous_employer"),
     (r"从事的岗位|现任岗位|现任职务", "current_position"),
+    # professional_certificate BEFORE professional_title (more specific)
+    (r"职称/职业资格证|专业职称|职业资格|职业资格证书|专业技术资格", "professional_certificate"),
     (r"职\s*称", "professional_title"),
     (r"社会经历|社会实践", "social_experience"),
-    (r"所学专业", "education_1_major"),
-    (r"学\s*历", "education_1_degree"),
-    (r"学\s*位", "education_1_degree"),
+    # ── Health & status ──
+    (r"既往病史|病史|健康状况|健康情况|健康状\s*态", "medical_history"),
+    (r"生育情况|生育状\s*态", "childbearing_status"),
+    (r"是否应届|应届", "is_fresh_graduate"),
+    # ── Emergency contact (before generic 联系人) ──
+    (r"紧急联系人|紧急联系", "emergency_contact"),
+    (r"关\s*系", "emergency_contact_relationship"),
     # ── Job seeking ──
     (r"求职意向|意向岗位", "expected_position"),
-    (r"应聘岗位|应聘的岗位|应聘岗位", "applied_position"),
+    (r"应聘二级学院|应聘院系|应聘学院|应聘部门", "applied_college"),
+    (r"应聘岗位|应聘的岗位|应聘岗\s*位", "applied_position"),
+    (r"岗\s*位", "applied_position"),
     (r"期望岗位|期望职位", "expected_position"),
-    (r"期望薪资|期望薪酬|薪资要求", "expected_salary"),
+    (r"期望月薪|期望薪资|期望薪酬|薪资要求|月薪要求", "expected_salary"),
     (r"期望城市|意向城市|期望工作地点", "expected_city"),
-    (r"到岗时间|可入职时间", "availability"),
+    (r"到岗时间|可入职时间|可到岗时间", "availability"),
     # ── Self evaluation ──
     (r"自我评价|自我介绍|个人简介", "self_evaluation"),
-    # ── Spouse info ──
+    # ── Spouse info (specific before generic) ──
     (r"配偶姓名|爱人姓名", "spouse_name"),
-    (r"配偶出生年月|配偶生日", "spouse_birth_date"),
+    (r"配偶出生年月|配偶生日|配偶出生日期", "spouse_birth_date"),
     (r"配偶工作单位|配偶单位", "spouse_work_unit"),
-    (r"配偶电话", "spouse_phone"),
+    (r"配偶电话|配偶联系", "spouse_phone"),
     (r"配偶籍贯", "spouse_hometown"),
     (r"配偶学历|配偶学位|配偶学历/学位", "spouse_education"),
     (r"配偶职称", "spouse_professional_title"),
+    (r"配偶性别", "spouse_gender"),
     # ── Additional form fields ──
     (r"最高学位|最高学历", "highest_degree"),
-    (r"既往病史|病史|健康状况|健康情况", "medical_history"),
     (r"主要科研成果|科研成果", "research_achievements"),
     (r"备\s*注", "remarks"),
     # ── Extra fields from various universities ──
@@ -80,12 +93,9 @@ FIELD_MAPPINGS: list[tuple[str, str]] = [
     (r"国\s*籍|国籍", "nationality_country"),
     (r"人事档案存放单位|档案存放地|档案所在单位", "archive_location"),
     (r"保险公积金|社保公积金|保险缴纳情况", "insurance_status"),
-    (r"招聘来源|招聘来源|招聘信息来源|获取招聘信息来源", "recruitment_source"),
+    (r"招聘来源|招聘信息来源|获取招聘信息来源", "recruitment_source"),
     (r"推荐人|推荐人姓名", "referrer"),
-    (r"学院联系人|联系人", "college_contact"),
     (r"可授课程|教授课程|能讲授课程|承担课程", "teachable_courses"),
-    (r"专业职称|职业资格|职业资格证书|专业技术资格", "professional_certificate"),
-    (r"紧急联系人|紧急联系", "emergency_contact"),
     (r"普通话等级|普通话水平|普通话", "mandarin_level"),
     (r"外语种类|外语语种|外语类型", "foreign_language_type"),
     (r"用人类型|用工类型|用工形式", "employment_type"),
@@ -108,33 +118,39 @@ FIELD_MAPPINGS: list[tuple[str, str]] = [
     (r"处分|受过处分|处分情况", "disciplinary_record"),
     # ── Summary fields (for paragraph-style templates) ──
     (r"毕业院校|学校名称|院校", "education_summary"),
-    (r"专业技能|技能特长|技能", "skills_summary"),
     (r"证书|资格证书|职业证书", "certificates_summary"),
     (r"语言能力|外语水平|语言", "languages_summary"),
-    (r"兴趣爱好|爱好|特长", "hobbies_summary"),
+    (r"兴趣爱好|爱\s*好", "hobbies_summary"),
 ]
 
 # Override mappings for spouse section: when inside "配偶" section,
 # these patterns take priority over the general FIELD_MAPPINGS
 SPOUSE_FIELD_OVERRIDES: list[tuple[str, str]] = [
     (r"姓\s*名", "spouse_name"),
-    (r"出生年月|出生日期|生日", "spouse_birth_date"),
+    (r"出生年月|出生日期|生日|出生时间", "spouse_birth_date"),
     (r"籍\s*贯", "spouse_hometown"),
     (r"学历/学位|学历|学位", "spouse_education"),
     (r"职\s*称", "spouse_professional_title"),
     (r"工作单位|单位", "spouse_work_unit"),
-    (r"电话|联系电话|手机", "spouse_phone"),
+    (r"电话|联系电话|手机|联系方式", "spouse_phone"),
     (r"有无既往病史|病史", "medical_history"),
     (r"性\s*别", "spouse_gender"),
+]
+
+# Override mappings for emergency contact section
+EMERGENCY_CONTACT_OVERRIDES: list[tuple[str, str]] = [
+    (r"姓\s*名|紧急联系人|紧急联系", "emergency_contact"),
+    (r"电话|联系人电话|联系电话|手机|联系方式", "emergency_contact_phone"),
+    (r"关\s*系", "emergency_contact_relationship"),
 ]
 
 # Section header patterns: identify multi-row table sections
 # Maps section header regex -> (data_prefix, is_spouse_section)
 SECTION_PATTERNS: dict[str, str] = {
-    r"教育经历|学习经历|教育背景|学历背景|学习简历": "education",
-    r"工作经历|工作经验|工作背景|职业经历|工作简历": "work",
-    r"项目经验|项目经历|科研项目|主持的主要科研项目": "project",
-    r"发表论文|论文列表|学术成果|发表的论文": "publication",
+    r"教育经历|学习经历|教育背景|学历背景|学习简历|教育情况": "education",
+    r"工作经历|工作经验|工作背景|职业经历|工作简历|工作经历/实践活动": "work",
+    r"项目经验|项目经历|科研项目|主持的主要科研项目|科研及成果": "project",
+    r"发表论文|论文列表|学术成果|发表的论文|发表论文及出版著作": "publication",
     r"获奖情况|荣誉奖项|获奖经历": "award",
     r"家庭成员|家庭情况|主要社会关系|家庭关系|配偶及子女": "family",
     r"社会经历|社会实践": "social",
@@ -142,49 +158,53 @@ SECTION_PATTERNS: dict[str, str] = {
 
 # Patterns that mark section boundaries for context tracking
 SECTION_BOUNDARY_PATTERNS: list[tuple[str, str]] = [
+    (r"紧急联系人|紧急联系", "emergency_contact"),
     (r"配偶及子女|配偶情况|家庭情况|家庭成员|家庭关系|主要社会关系", "spouse"),
-    (r"教育经历|学习经历|教育背景|学历背景|学习简历", "education"),
-    (r"工作经历|工作经验|工作背景|职业经历|工作简历", "work"),
-    (r"项目经验|项目经历|科研项目|主持的主要科研项目", "project"),
-    (r"发表论文|论文列表|学术成果|发表的论文", "publication"),
+    (r"教育经历|学习经历|教育背景|学历背景|学习简历|教育情况", "education"),
+    (r"工作经历|工作经验|工作背景|职业经历|工作简历|工作经历/实践活动", "work"),
+    (r"项目经验|项目经历|科研项目|主持的主要科研项目|科研及成果", "project"),
+    (r"发表论文|论文列表|学术成果|发表的论文|发表论文及出版著作", "publication"),
     (r"获奖情况|荣誉奖项|获奖经历", "award"),
-    (r"主要科研成果|科研成果", "research"),
+    (r"主要科研成果|科研成果|学术专长", "research"),
     (r"备\s*注", "remarks"),
     (r"来源", "source"),
-    (r"基本资料|基本情况|个人信息", "personal"),
+    (r"基本资料|基本情况|个人信息|基本信息", "personal"),
 ]
 
 # Column header patterns: map column header text to field suffix
 COLUMN_MAPPINGS: dict[str, dict[str, str]] = {
     "education": {
-        r"起止时间|时间|起讫时间|在校时间|起止年月|年月|学习时间|"
-        r"就读时间|从何时至何时|何年何月": "date_range",
-        r"院校名称|学校名称|院校|毕业院校|学校|就读院校|"
-        r"毕业学校|就读学校|何学校|院\s*校": "school",
-        r"专\s*业|所学专业|专业名称|学习专业|专业方向": "major",
+        # date_range before generic 时间
+        r"起止时间|起讫时间|在校时间|起止年月|"
+        r"学习时间|就读时间|从何时至何时|何年何月|时\s*间|年月": "date_range",
+        r"毕业院校|院校名称|学校名称|毕业学校|就读院校|"
+        r"就读学校|何学校|院\s*校|院\s*校|学\s*校": "school",
+        r"毕业专业|专\s*业|所学专业|专业名称|学习专业|专业方向": "major",
         r"学\s*历|学历层次": "degree",
         r"学\s*位|学位名称|学位类型": "degree",
         r"研究方向|方向|研究方\s*向|课题方向": "research_direction",
         r"学习层次|层次|培养层次|学历层次": "education_level",
-        r"办学形式|培养方式|学习形式|就读形式": "education_form",
+        r"学习形式|办学形式|培养方式|就读形式": "education_form",
+        r"证明人电话|证明电话": "reference_phone",
         r"证明人|证人": "reference_person",
-        r"证明人电话|联系电话|电话|证明电话": "reference_phone",
         r"GPA|成绩|学业绩点|成绩绩点": "gpa",
         r"备注|说明|描述|备注说明": "description",
     },
     "work": {
-        r"起止时间|时间|起讫时间|工作时间|起止年月|年月|"
-        r"何年何月|从何时至何时|任职时间": "date_range",
-        r"工作单位|单位名称|单位|公司|任何单位|任职单位|"
-        r"就职单位|所在单位|何单位": "company",
-        r"职\s*位|职务|岗位|担任的职务|任职|"
-        r"岗位名称|工作职务|任何职务": "position",
+        # date_range before generic 时间
+        r"起止时间|起讫时间|工作时间|起止年月|"
+        r"何年何月|从何时至何时|任职时间|时\s*间": "date_range",
+        r"工作单位|单位名称|任何单位|任职单位|"
+        r"就职单位|所在单位|何单位|单\s*位|公司": "company",
+        r"岗位/职务|职\s*位|职务|担任的职务|任职|"
+        r"工作职务|任何职务|岗\s*位": "position",
         r"职称|专业技术职务|专业技术职称|技术职称|任职职称": (
             "professional_title"
         ),
         r"部门|院系|科室|所在部门": "department",
+        # 证明人电话 BEFORE 证明人 (specific before generic)
+        r"证明人电话|证明电话": "reference_phone",
         r"证明人|证人": "reference_person",
-        r"证明人电话|联系电话|电话|证明电话": "reference_phone",
         r"工作内容|职责|描述|备注|工作内容描述|教学专业|"
         r"任教专业|教授课程|教学内容|工作职责|主要工作": "description",
     },
@@ -255,6 +275,10 @@ class FieldDetector:
         self._spouse_compiled = [
             (re.compile(p, re.IGNORECASE), k)
             for p, k in SPOUSE_FIELD_OVERRIDES
+        ]
+        self._emergency_contact_compiled = [
+            (re.compile(p, re.IGNORECASE), k)
+            for p, k in EMERGENCY_CONTACT_OVERRIDES
         ]
         self._boundary_compiled = [
             (re.compile(p, re.IGNORECASE), ctx)
@@ -664,6 +688,7 @@ class FieldDetector:
 
         Context-aware: when inside a "配偶" section, uses spouse-specific
         field mappings instead of general ones.
+        When inside "紧急联系人" section, uses emergency contact mappings.
         """
         for table in doc.tables:
             # Track which section context we're in
@@ -690,9 +715,13 @@ class FieldDetector:
                     if cell_id in filled_cells:
                         continue
 
-                    # Determine which mapping set to use
+                    # Determine which mapping set to use based on context
                     if current_context == "spouse":
                         mapping_set = self._spouse_compiled + self._compiled
+                    elif current_context == "emergency_contact":
+                        mapping_set = (
+                            self._emergency_contact_compiled + self._compiled
+                        )
                     else:
                         mapping_set = self._compiled
 
@@ -700,14 +729,14 @@ class FieldDetector:
                         if not pattern.search(text):
                             continue
 
-                        # For spouse context, skip if general mapping
-                        # already matched and spouse value is empty
+                        # For spouse/emergency context, skip if general
+                        # mapping already matched and value is empty
                         value = data.get(key, "")
                         if not value:
                             continue
 
                         # Skip if cell already contains exactly this value
-                        # (avoid substring false positives like "无" in "有无既往病史")
+                        # (avoid substring false positives)
                         stripped_text = cell.text.strip()
                         if (
                             stripped_text.endswith(value)

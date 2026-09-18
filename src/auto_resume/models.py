@@ -236,12 +236,18 @@ class ResumeData:
     spouse_hometown: str = ""             # 配偶籍贯
     spouse_education: str = ""           # 配偶学历/学位
     spouse_professional_title: str = ""  # 配偶职称
+    spouse_gender: str = ""              # 配偶性别
 
     # ── Additional form fields ──
     highest_degree: str = ""            # 最高学位
     medical_history: str = ""           # 既往病史/健康状况
     research_achievements: str = ""     # 主要科研成果
     remarks: str = ""                   # 备注
+
+    # ── Emergency contact ──
+    emergency_contact: str = ""         # 紧急联系人
+    emergency_contact_phone: str = ""   # 紧急联系人电话
+    emergency_contact_relationship: str = ""  # 紧急联系人关系
 
     # ── Extra fields from various universities ──
     birthplace: str = ""                # 出生地
@@ -251,10 +257,8 @@ class ResumeData:
     insurance_status: str = ""         # 保险公积金
     recruitment_source: str = ""       # 招聘来源
     referrer: str = ""                 # 推荐人
-    college_contact: str = ""          # 学院联系人
     teachable_courses: str = ""        # 可授课程
-    professional_certificate: str = "" # 专业职称/职业资格
-    emergency_contact: str = ""        # 紧急联系人
+    professional_certificate: str = "" # 职称/职业资格证
     mandarin_level: str = ""           # 普通话等级
     foreign_language_type: str = ""    # 外语种类
     employment_type: str = ""          # 用工类型
@@ -275,6 +279,9 @@ class ResumeData:
     integrity_commitment: str = ""     # 诚信承诺
     awards_punishments: str = ""       # 奖惩情况
     disciplinary_record: str = ""     # 处分情况
+    childbearing_status: str = ""      # 生育情况
+    is_fresh_graduate: str = ""        # 是否应届
+    applied_college: str = ""          # 应聘二级学院
 
     # ── Lists (multi-entry) ──
     education: list[Education] = field(default_factory=list)
@@ -305,22 +312,25 @@ class ResumeData:
             "previous_employer", "current_position", "professional_title",
             "social_experience",
             # Job seeking
-            "job_intent", "applied_position", "expected_position",
-            "expected_salary", "expected_city", "availability",
+            "job_intent", "applied_position", "applied_college",
+            "expected_position", "expected_salary", "expected_city",
+            "availability",
             # Self evaluation
             "self_evaluation",
             # Spouse
             "spouse_name", "spouse_birth_date", "spouse_work_unit",
             "spouse_phone", "spouse_hometown", "spouse_education",
-            "spouse_professional_title",
+            "spouse_professional_title", "spouse_gender",
             # Additional form fields
             "highest_degree", "medical_history", "research_achievements",
             "remarks",
+            # Emergency contact
+            "emergency_contact", "emergency_contact_phone",
+            "emergency_contact_relationship",
             # Extra fields from various universities
             "birthplace", "work_start_date", "nationality_country",
             "archive_location", "insurance_status", "recruitment_source",
-            "referrer", "college_contact", "teachable_courses",
-            "professional_certificate", "emergency_contact",
+            "referrer", "teachable_courses", "professional_certificate",
             "mandarin_level", "foreign_language_type", "employment_type",
             "country", "province_city", "advisor_status",
             "masters_supervised", "doctors_supervised", "position_type",
@@ -328,6 +338,7 @@ class ResumeData:
             "arrival_date", "academic_positions", "talent_title",
             "current_position_level", "is_retired", "integrity_commitment",
             "awards_punishments", "disciplinary_record",
+            "childbearing_status", "is_fresh_graduate",
         ]
         for f in simple_fields:
             if f in data:
@@ -382,14 +393,28 @@ class ResumeData:
             "specialty", "computer_proficiency", "foreign_language",
             "previous_employer", "current_position", "professional_title",
             "social_experience",
-            "job_intent", "applied_position", "expected_position",
-            "expected_salary", "expected_city", "availability",
+            "job_intent", "applied_position", "applied_college",
+            "expected_position", "expected_salary", "expected_city",
+            "availability",
             "self_evaluation",
             "spouse_name", "spouse_birth_date", "spouse_work_unit",
             "spouse_phone", "spouse_hometown", "spouse_education",
-            "spouse_professional_title",
+            "spouse_professional_title", "spouse_gender",
             "highest_degree", "medical_history", "research_achievements",
             "remarks",
+            "emergency_contact", "emergency_contact_phone",
+            "emergency_contact_relationship",
+            "birthplace", "work_start_date", "nationality_country",
+            "archive_location", "insurance_status", "recruitment_source",
+            "referrer", "teachable_courses", "professional_certificate",
+            "mandarin_level", "foreign_language_type", "employment_type",
+            "country", "province_city", "advisor_status",
+            "masters_supervised", "doctors_supervised", "position_type",
+            "position_code", "affiliated_college", "affiliated_department",
+            "arrival_date", "academic_positions", "talent_title",
+            "current_position_level", "is_retired", "integrity_commitment",
+            "awards_punishments", "disciplinary_record",
+            "childbearing_status", "is_fresh_graduate",
         ]
 
         for f in simple_fields:

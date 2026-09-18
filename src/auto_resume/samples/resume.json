@@ -39,6 +39,15 @@
   "spouse_work_unit": "",
   "spouse_phone": "",
 
+  "emergency_contact": "李紧急",
+  "emergency_contact_phone": "13900001111",
+  "emergency_contact_relationship": "妻子",
+
+  "childbearing_status": "无",
+  "is_fresh_graduate": "否",
+  "applied_college": "计算机学院",
+  "professional_certificate": "高校教师资格证",
+
   "education": [
     {
       "school": "浙江大学",
