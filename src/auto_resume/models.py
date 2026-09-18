@@ -368,50 +368,52 @@ class ResumeData:
             valid = {f.name for f in __import__("dataclasses").fields(cls)}
             return {k: v for k, v in d.items() if k in valid}
 
+        def _build(items, cls, **extra):
+            result = []
+            for item in items:
+                if isinstance(item, dict):
+                    result.append(cls(**_filter_fields(item, cls)))
+                elif isinstance(item, str):
+                    result.append(cls(**extra))
+                else:
+                    result.append(cls())
+            return result
+
         if "education" in data:
             val = data["education"]
             if isinstance(val, list):
-                resume.education = [
-                    Education(**_filter_fields(e, Education)) if isinstance(e, dict) else Education()
-                    for e in val
-                ]
+                resume.education = _build(val, Education)
         if "work_experience" in data:
             val = data["work_experience"]
             if isinstance(val, list):
-                resume.work_experience = [
-                    WorkExperience(**_filter_fields(w, WorkExperience)) if isinstance(w, dict) else WorkExperience()
-                    for w in val
-                ]
+                resume.work_experience = _build(val, WorkExperience)
         if "projects" in data:
             val = data["projects"]
             if isinstance(val, list):
-                resume.projects = [
-                    Project(**_filter_fields(p, Project)) if isinstance(p, dict) else Project()
-                    for p in val
-                ]
+                resume.projects = _build(val, Project)
         if "publications" in data:
             val = data["publications"]
             if isinstance(val, list):
-                resume.publications = [
-                    Publication(**_filter_fields(p, Publication)) if isinstance(p, dict) else Publication()
-                    for p in val
-                ]
+                resume.publications = _build(val, Publication)
         if "awards" in data:
             val = data["awards"]
             if isinstance(val, list):
-                resume.awards = [
-                    Award(**_filter_fields(a, Award)) if isinstance(a, dict) else Award(title=str(a))
-                    for a in val
-                ]
+                resume.awards = _build(val, Award, title="")
+                # Override: strings become Award(title=str)
+                resume.awards = []
+                for a in val:
+                    if isinstance(a, dict):
+                        resume.awards.append(
+                            Award(**_filter_fields(a, Award))
+                        )
+                    else:
+                        resume.awards.append(Award(title=str(a)))
             elif isinstance(val, str):
                 resume.awards_summary = val
         if "family_members" in data:
             val = data["family_members"]
             if isinstance(val, list):
-                resume.family_members = [
-                    FamilyMember(**_filter_fields(f, FamilyMember)) if isinstance(f, dict) else FamilyMember()
-                    for f in val
-                ]
+                resume.family_members = _build(val, FamilyMember)
         if "skills" in data:
             val = data["skills"]
             if isinstance(val, list):
