@@ -58,8 +58,11 @@ FIELD_MAPPINGS: list[tuple[str, str]] = [
     (r"从事的岗位|现任岗位|现任职务", "current_position"),
     # professional_certificate BEFORE professional_title (more specific)
     (r"职称/职业资格证|专业职称|职业资格|职业资格证书|专业技术资格", "professional_certificate"),
-    (r"职\s*称", "professional_title"),
+    (r"职务职称|职\s*称", "professional_title"),
     (r"社会经历|社会实践", "social_experience"),
+    (r"所学专业", "education_1_major"),
+    (r"毕业学校", "education_summary"),
+    (r"毕业时间", "graduation_date"),
     # ── Health & status ──
     (r"既往病史|病史|健康状况|健康情况|健康状\s*态", "medical_history"),
     (r"生育情况|生育状\s*态", "childbearing_status"),
@@ -120,8 +123,12 @@ FIELD_MAPPINGS: list[tuple[str, str]] = [
     (r"诚信承诺|本人承诺", "integrity_commitment"),
     (r"奖惩情况|奖惩", "awards_punishments"),
     (r"处分|受过处分|处分情况", "disciplinary_record"),
+    (r"个\s*人.*荣誉.*获奖|荣誉.*获奖|主要荣誉", "awards_summary"),
+    (r"签\s*名", "signature"),
+    (r"学\s*制", "education_duration"),
+    (r"主要科研.*成果.*简介|科研.*成果.*简介", "research_achievements"),
     # ── Summary fields (for paragraph-style templates) ──
-    (r"毕业院校|学校名称|院校", "education_summary"),
+    (r"毕业院校|学校名称|院校名称", "education_summary"),
     (r"证书|资格证书|职业证书", "certificates_summary"),
     (r"语言能力|外语水平|语言", "languages_summary"),
     (r"兴趣爱好|爱\s*好", "hobbies_summary"),
@@ -150,26 +157,30 @@ EMERGENCY_CONTACT_OVERRIDES: list[tuple[str, str]] = [
 
 # Section header patterns: identify multi-row table sections
 # Maps section header regex -> (data_prefix, is_spouse_section)
+# Section header patterns: identify multi-row table sections
+# Note: cell text may contain newlines (e.g. "学习\n经历"), so patterns
+# use flexible whitespace matching with \s* and dotall where needed
 SECTION_PATTERNS: dict[str, str] = {
-    r"教育经历|学习经历|教育背景|学历背景|学习简历|教育情况": "education",
-    r"工作经历|工作经验|工作背景|职业经历|工作简历|工作经历/实践活动": "work",
+    r"教育经历|学习\s*经历|教育背景|学历背景|学习简历|教育情况|学习\s*经\s*历": "education",
+    r"工作经历|工作\s*经验|工作背景|职业经历|工作简历|工作\s*经\s*历": "work",
     r"项目经验|项目经历|科研项目|主持的主要科研项目|科研及成果": "project",
     r"发表论文|论文列表|学术成果|发表的论文|发表论文及出版著作": "publication",
-    r"获奖情况|荣誉奖项|获奖经历": "award",
-    r"家庭成员|家庭情况|主要社会关系|家庭关系|配偶及子女": "family",
+    r"获奖情况|荣誉奖项|获奖经历|个人.*荣誉.*获奖|主要荣誉": "award",
+    r"家庭成员|家庭\s*情况|主要社会关系|家庭关系|配偶及子女|家\s*庭\s*情\s*况": "family",
     r"社会经历|社会实践": "social",
 }
 
 # Patterns that mark section boundaries for context tracking
+# Handles cells with embedded newlines (e.g. "学习\n经历")
 SECTION_BOUNDARY_PATTERNS: list[tuple[str, str]] = [
     (r"紧急联系人|紧急联系", "emergency_contact"),
-    (r"配偶及子女|配偶情况|家庭情况|家庭成员|家庭关系|主要社会关系", "spouse"),
-    (r"教育经历|学习经历|教育背景|学历背景|学习简历|教育情况", "education"),
-    (r"工作经历|工作经验|工作背景|职业经历|工作简历|工作经历/实践活动", "work"),
+    (r"配偶及子女|配偶情况|家庭\s*情况|家庭成员|家庭关系|主要社会关系", "spouse"),
+    (r"教育经历|学习\s*经历|教育背景|学历背景|学习简历|教育情况", "education"),
+    (r"工作经历|工作\s*经验|工作背景|职业经历|工作简历", "work"),
     (r"项目经验|项目经历|科研项目|主持的主要科研项目|科研及成果", "project"),
     (r"发表论文|论文列表|学术成果|发表的论文|发表论文及出版著作", "publication"),
-    (r"获奖情况|荣誉奖项|获奖经历", "award"),
-    (r"主要科研成果|科研成果|学术专长", "research"),
+    (r"获奖情况|荣誉奖项|获奖经历|个人.*荣誉.*获奖|主要荣誉", "award"),
+    (r"主要科研.*成果|科研成果|学术专长", "research"),
     (r"备\s*注", "remarks"),
     (r"来源", "source"),
     (r"基本资料|基本情况|个人信息|基本信息", "personal"),
@@ -182,10 +193,12 @@ COLUMN_MAPPINGS: dict[str, dict[str, str]] = {
         r"起止时间|起讫时间|在校时间|起止年月|"
         r"学习时间|就读时间|从何时至何时|何年何月|时\s*间|年月": "date_range",
         r"毕业院校|院校名称|学校名称|毕业学校|就读院校|"
-        r"就读学校|何学校|院\s*校|院\s*校|学\s*校": "school",
-        r"毕业专业|专\s*业|所学专业|专业名称|学习专业|专业方向": "major",
+        r"就读学校|何学校|院\s*校|学\s*校": "school",
+        r"毕业专业|专\s*业|所学专业|专业名称|学习专业|"
+        r"专业方向|专业（方向）|专业\(方向\)": "major",
         r"学\s*历|学历层次": "degree",
         r"学\s*位|学位名称|学位类型": "degree",
+        r"学\s*制|学制": "education_duration",
         r"研究方向|方向|研究方\s*向|课题方向": "research_direction",
         r"学习层次|层次|培养层次|学历层次": "education_level",
         r"学习形式|办学形式|培养方式|就读形式": "education_form",
@@ -780,6 +793,42 @@ class FieldDetector:
 
     # ──────────────────── Phase 3: Single-Value Labels ────────────────────
 
+    def _is_vertically_merged(self, table: Table, r_idx: int, c_idx: int) -> bool:
+        """Check if a cell is part of a vertical merge (vMerge).
+
+        Returns True if the cell at (r_idx, c_idx) is vertically merged
+        with the cell above it (i.e., it's a continuation of a merge
+        started in a previous row).
+        """
+        try:
+            cell = table.rows[r_idx].cells[c_idx]
+            tc = cell._tc
+            tcPr = tc.find(
+                "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}tcPr"
+            )
+            if tcPr is not None:
+                vMerge = tcPr.find(
+                    "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}vMerge"
+                )
+                if vMerge is not None:
+                    # vMerge with no val or val="continue" means this is
+                    # a continuation of a merge from above
+                    val = vMerge.get(
+                        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}val"
+                    )
+                    if val is None or val == "continue":
+                        return True
+        except (IndexError, AttributeError):
+            pass
+        return False
+
+    def _is_same_cell(self, row1, c_idx1: int, row2, c_idx2: int) -> bool:
+        """Check if two cells are actually the same underlying cell (merged)."""
+        try:
+            return row1.cells[c_idx1]._tc is row2.cells[c_idx2]._tc
+        except (IndexError, AttributeError):
+            return False
+
     def _fill_single_value_labels(self, doc: Document, data: dict[str, str]) -> None:
         """Smart-detect label cells and fill adjacent blanks (multi-direction).
 
@@ -787,11 +836,18 @@ class FieldDetector:
         Context-aware: when inside a "配偶" section, uses spouse-specific
         field mappings; when inside "紧急联系人" section, uses emergency
         contact mappings.
+        Handles vertical merges: skips cells that are merge continuations,
+        and avoids writing to cells that share underlying XML with label cells.
+        When a target cell is vertically merged with a cell below, and the
+        row below has a different label at the same column, defers to the
+        row below (let it claim the shared cell).
         """
         for table in doc.tables:
             # Track which section context we're in
             current_context: str = "personal"  # default
             filled_cells: set[tuple[int, int]] = set()
+            # Track underlying tc elements that have been written to
+            written_tcs: set[int] = set()
 
             for r_idx, row in enumerate(table.rows):
                 cells = row.cells
@@ -806,6 +862,10 @@ class FieldDetector:
                 for c_idx, cell in enumerate(cells):
                     text = cell.text.strip()
                     if not text:
+                        continue
+
+                    # Skip cells that are vertical merge continuations
+                    if self._is_vertically_merged(table, r_idx, c_idx):
                         continue
 
                     # Skip already filled cells
@@ -825,7 +885,6 @@ class FieldDetector:
                         continue
 
                     # Skip if cell already contains exactly this value
-                    # (avoid substring false positives)
                     stripped_text = cell.text.strip()
                     if (
                         stripped_text.endswith(value)
@@ -833,24 +892,41 @@ class FieldDetector:
                     ):
                         continue
 
-                    # Strategy 1: Adjacent right cell
-                    if c_idx + 1 < len(cells):
-                        next_cell = cells[c_idx + 1]
-                        next_id = (id(row), c_idx + 1)
-                        if not next_cell.text.strip() and next_id not in filled_cells:
-                            self._set_cell_text(next_cell, value)
-                            filled_cells.add(next_id)
+                    # Strategy 1: Find first empty cell to the right,
+                    # skipping horizontally merged cells and duplicate labels
+                    for scan_idx in range(c_idx + 1, len(cells)):
+                        next_cell = cells[scan_idx]
+                        # Skip cells that share the same tc (horizontal merge)
+                        if next_cell._tc is cell._tc:
                             continue
+                        # Skip cells with same text as label (merged duplicates
+                        # that don't share tc, common in LibreOffice conversions)
+                        if next_cell.text.strip() == text:
+                            continue
+                        # Found a distinct cell — check if it's empty
+                        next_id = (id(row), scan_idx)
+                        next_tc_id = id(next_cell._tc)
+                        if not next_cell.text.strip():
+                            if (next_id not in filled_cells
+                                    and next_tc_id not in written_tcs):
+                                self._set_cell_text(next_cell, value)
+                                filled_cells.add(next_id)
+                                written_tcs.add(next_tc_id)
+                        break
 
                     # Strategy 2: Cell below (next row, same column)
                     if r_idx + 1 < len(table.rows):
                         below_row = table.rows[r_idx + 1]
                         below_cell = below_row.cells[c_idx]
                         below_id = (id(below_row), c_idx)
+                        below_tc_id = id(below_cell._tc)
                         if (not below_cell.text.strip()
-                                and below_id not in filled_cells):
+                                and below_id not in filled_cells
+                                and below_tc_id not in written_tcs
+                                and below_cell._tc is not cell._tc):
                             self._set_cell_text(below_cell, value)
                             filled_cells.add(below_id)
+                            written_tcs.add(below_tc_id)
                             continue
 
                     # Strategy 3: Same cell with "label:___" format
@@ -858,6 +934,7 @@ class FieldDetector:
                         new_text = text + " " + value
                         self._set_cell_text(cell, new_text)
                         filled_cells.add(cell_id)
+                        written_tcs.add(id(cell._tc))
                         continue
 
                     # Strategy 4: Same cell with "label：" + empty space
@@ -868,6 +945,7 @@ class FieldDetector:
                         if new_text != text:
                             self._set_cell_text(cell, new_text)
                             filled_cells.add(cell_id)
+                            written_tcs.add(id(cell._tc))
                             continue
 
         # Also fill paragraph-based labels (label: value format)

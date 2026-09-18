@@ -162,6 +162,10 @@ FIELD_ALIASES: dict[str, list[str]] = {
     "integrity_commitment": ["诚信承诺", "本人承诺", "承诺"],
     "awards_punishments": ["奖惩情况", "奖惩"],
     "disciplinary_record": ["处分", "受过处分", "处分情况"],
+    "signature": ["签名", "签字", "手写签名"],
+    "education_duration": ["学制", "学制年限"],
+    "graduation_date": ["毕业时间", "毕业日期", "毕业年月"],
+    "awards_summary": ["个人主要荣誉及获奖", "主要荣誉", "荣誉获奖"],
 
     # ── Summary fields ──
     "education_summary": ["毕业院校", "学校名称", "院校", "毕业学校"],
@@ -178,7 +182,7 @@ FIELD_ALIASES: dict[str, list[str]] = {
 SEMANTIC_KEYWORDS: dict[str, list[str]] = {
     "name": ["姓名", "名字"],
     "gender": ["性别", "男", "女"],
-    "birth_date": ["出生", "生日", "年月"],
+    "birth_date": ["出生", "生日", "出生年月"],
     "age": ["年龄", "岁"],
     "phone": ["电话", "手机", "联系", "电话号码"],
     "email": ["邮箱", "邮件", "email", "E-mail", "电子"],
@@ -211,6 +215,10 @@ SEMANTIC_KEYWORDS: dict[str, list[str]] = {
     "teachable_courses": ["课程", "授课", "教学"],
     "education_summary": ["毕业院校", "院校", "学校"],
     "is_fresh_graduate": ["应届", "毕业生"],
+    "signature": ["签名", "签字"],
+    "graduation_date": ["毕业时间", "毕业"],
+    "awards_summary": ["荣誉", "获奖", "奖励"],
+    "education_duration": ["学制"],
 }
 
 # ──────────────────── Column Header Aliases ────────────────────
@@ -233,7 +241,8 @@ COLUMN_ALIASES: dict[str, dict[str, list[str]]] = {
             "专业方向", "毕业专业",
         ],
         "degree": ["学历", "学位", "学历层次", "学位名称", "学位类型"],
-        "research_direction": ["研究方向", "方向", "课题方向"],
+        "education_duration": ["学制", "学制年限"],
+        "research_direction": ["研究方向", "方向", "课题方向", "专业（方向）", "专业方向"],
         "education_level": ["学习层次", "层次", "培养层次", "学历层次"],
         "education_form": ["办学形式", "培养方式", "学习形式", "就读形式"],
         "reference_person": ["证明人", "证人"],

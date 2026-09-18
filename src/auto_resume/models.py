@@ -35,6 +35,7 @@ class Education:
     education_form: str = ""       # 办学形式 (全日制/非全日制/成人/网络教育)
     reference_person: str = ""     # 证明人
     reference_phone: str = ""      # 证明人电话
+    duration: str = ""             # 学制
 
     def to_text(self) -> str:
         parts = [f"{self.school} | {self.major} | {self.degree}"]
@@ -282,6 +283,10 @@ class ResumeData:
     childbearing_status: str = ""      # 生育情况
     is_fresh_graduate: str = ""        # 是否应届
     applied_college: str = ""          # 应聘二级学院
+    signature: str = ""                # 签名
+    education_duration: str = ""      # 学制
+    graduation_date: str = ""         # 毕业时间
+    awards_summary: str = ""          # 个人主要荣誉及获奖
 
     # ── Lists (multi-entry) ──
     education: list[Education] = field(default_factory=list)
@@ -339,6 +344,8 @@ class ResumeData:
             "current_position_level", "is_retired", "integrity_commitment",
             "awards_punishments", "disciplinary_record",
             "childbearing_status", "is_fresh_graduate",
+            "signature", "education_duration", "graduation_date",
+            "awards_summary",
         ]
         for f in simple_fields:
             if f in data:
@@ -415,6 +422,8 @@ class ResumeData:
             "current_position_level", "is_retired", "integrity_commitment",
             "awards_punishments", "disciplinary_record",
             "childbearing_status", "is_fresh_graduate",
+            "signature", "education_duration", "graduation_date",
+            "awards_summary",
         ]
 
         for f in simple_fields:
