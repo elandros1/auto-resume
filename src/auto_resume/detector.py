@@ -66,6 +66,14 @@ FIELD_MAPPINGS: list[tuple[str, str]] = [
     (r"配偶出生年月|配偶生日", "spouse_birth_date"),
     (r"配偶工作单位|配偶单位", "spouse_work_unit"),
     (r"配偶电话", "spouse_phone"),
+    (r"配偶籍贯", "spouse_hometown"),
+    (r"配偶学历|配偶学位|配偶学历/学位", "spouse_education"),
+    (r"配偶职称", "spouse_professional_title"),
+    # ── Additional form fields ──
+    (r"最高学位|最高学历", "highest_degree"),
+    (r"既往病史|病史", "medical_history"),
+    (r"主要科研成果|科研成果", "research_achievements"),
+    (r"备\s*注", "remarks"),
     # ── Summary fields (for paragraph-style templates) ──
     (r"毕业院校|学校名称|院校", "education_summary"),
     (r"专业技能|技能特长|技能", "skills_summary"),
@@ -74,18 +82,45 @@ FIELD_MAPPINGS: list[tuple[str, str]] = [
     (r"兴趣爱好|爱好|特长", "hobbies_summary"),
 ]
 
+# Override mappings for spouse section: when inside "配偶" section,
+# these patterns take priority over the general FIELD_MAPPINGS
+SPOUSE_FIELD_OVERRIDES: list[tuple[str, str]] = [
+    (r"姓\s*名", "spouse_name"),
+    (r"出生年月|出生日期|生日", "spouse_birth_date"),
+    (r"籍\s*贯", "spouse_hometown"),
+    (r"学历/学位|学历|学位", "spouse_education"),
+    (r"职\s*称", "spouse_professional_title"),
+    (r"工作单位|单位", "spouse_work_unit"),
+    (r"电话|联系电话|手机", "spouse_phone"),
+    (r"有无既往病史|病史", "medical_history"),
+    (r"性\s*别", "spouse_gender"),
+]
+
 # Section header patterns: identify multi-row table sections
-# Maps section header regex -> data prefix used in flat dict
-# e.g. "education" prefix produces keys: education_1_school, education_1_major, etc.
+# Maps section header regex -> (data_prefix, is_spouse_section)
 SECTION_PATTERNS: dict[str, str] = {
-    r"教育经历|学习经历|教育背景|学历背景": "education",
-    r"工作经历|工作经验|工作背景|职业经历": "work",
+    r"教育经历|学习经历|教育背景|学历背景|学习简历": "education",
+    r"工作经历|工作经验|工作背景|职业经历|工作简历": "work",
     r"项目经验|项目经历|科研项目|主持的主要科研项目": "project",
     r"发表论文|论文列表|学术成果|发表的论文": "publication",
     r"获奖情况|荣誉奖项|获奖经历": "award",
-    r"家庭成员|家庭情况|主要社会关系|家庭关系": "family",
+    r"家庭成员|家庭情况|主要社会关系|家庭关系|配偶及子女": "family",
     r"社会经历|社会实践": "social",
 }
+
+# Patterns that mark section boundaries for context tracking
+SECTION_BOUNDARY_PATTERNS: list[tuple[str, str]] = [
+    (r"配偶及子女|配偶情况|家庭情况|家庭成员|家庭关系|主要社会关系", "spouse"),
+    (r"教育经历|学习经历|教育背景|学历背景|学习简历", "education"),
+    (r"工作经历|工作经验|工作背景|职业经历|工作简历", "work"),
+    (r"项目经验|项目经历|科研项目|主持的主要科研项目", "project"),
+    (r"发表论文|论文列表|学术成果|发表的论文", "publication"),
+    (r"获奖情况|荣誉奖项|获奖经历", "award"),
+    (r"主要科研成果|科研成果", "research"),
+    (r"备\s*注", "remarks"),
+    (r"来源", "source"),
+    (r"基本资料|基本情况|个人信息", "personal"),
+]
 
 # Column header patterns: map column header text to field suffix
 COLUMN_MAPPINGS: dict[str, dict[str, str]] = {
@@ -95,6 +130,7 @@ COLUMN_MAPPINGS: dict[str, dict[str, str]] = {
         r"专\s*业": "major",
         r"学\s*历": "degree",
         r"学\s*位": "degree",
+        r"研究方向|方向": "research_direction",
         r"学习层次|层次": "education_level",
         r"办学形式|培养方式": "education_form",
         r"证明人": "reference_person",
@@ -173,6 +209,14 @@ class FieldDetector:
             ]
             for prefix, cols in COLUMN_MAPPINGS.items()
         }
+        self._spouse_compiled = [
+            (re.compile(p, re.IGNORECASE), k)
+            for p, k in SPOUSE_FIELD_OVERRIDES
+        ]
+        self._boundary_compiled = [
+            (re.compile(p, re.IGNORECASE), ctx)
+            for p, ctx in SECTION_BOUNDARY_PATTERNS
+        ]
 
     # ──────────────────── Public API ────────────────────
 
@@ -425,39 +469,43 @@ class FieldDetector:
         prefix: str,
         data: dict[str, str],
     ) -> None:
-        """Fill one section within a table, starting at the given header row."""
+        """Fill one section within a table, starting at the given header row.
 
-        # Find the column header row
-        col_header_r_idx = header_r_idx + 1
-        if col_header_r_idx >= len(table.rows):
-            # Maybe header row itself has column labels
-            col_header_r_idx = header_r_idx
-            column_map = self._detect_column_mappings(
-                table.rows[col_header_r_idx], prefix
-            )
-        else:
-            column_map = self._detect_column_mappings(
-                table.rows[col_header_r_idx], prefix
-            )
-            if not column_map:
-                # Try the header row itself
-                col_header_r_idx = header_r_idx
-                column_map = self._detect_column_mappings(
-                    table.rows[col_header_r_idx], prefix
-                )
+        Scans forward up to 5 rows after the section header to find
+        the column header row, handling templates with blank rows
+        between the section header and column headers.
+        """
 
-        if not column_map:
+        # Find the column header row by scanning forward
+        col_header_r_idx = None
+        column_map = {}
+
+        # Check rows header_r_idx through header_r_idx + 5
+        max_scan = min(header_r_idx + 6, len(table.rows))
+        best_match_count = 0
+
+        for r_idx in range(header_r_idx, max_scan):
+            row = table.rows[r_idx]
+            candidate_map = self._detect_column_mappings(row, prefix)
+            match_count = len(candidate_map)
+            if match_count > best_match_count:
+                best_match_count = match_count
+                col_header_r_idx = r_idx
+                column_map = candidate_map
+            if match_count >= 2:
+                # Good enough — found the column header row
+                break
+
+        if not column_map or best_match_count == 0:
             return
 
         # Determine how many entries to fill
-        # Handle inconsistent count key naming across sections
         count_key = f"{prefix}_count"
         if prefix == "work":
             count_key = "work_experience_count"
         elif prefix == "family":
             count_key = "family_members_count"
         elif prefix == "social":
-            # Social experience is a single string field, not a list
             data_count = 1
             count_key = ""
         data_count = int(data.get(count_key, "0")) if count_key else data_count
@@ -465,12 +513,10 @@ class FieldDetector:
             return
 
         # Fill data rows after the column header row
-        # If header row == column header row, data starts at header_r_idx + 1
-        # Otherwise data starts at col_header_r_idx + 1
         data_start_r_idx = col_header_r_idx + 1
 
         # Don't fill into the next section's rows
-        next_section_r_idx = len(table.rows)  # default: end of table
+        next_section_r_idx = len(table.rows)
         for r_idx in range(data_start_r_idx, len(table.rows)):
             row_text = " ".join(
                 cell.text.strip() for cell in table.rows[r_idx].cells
@@ -482,11 +528,14 @@ class FieldDetector:
 
         available_rows = next_section_r_idx - data_start_r_idx
 
+        # Track filled cells to avoid duplicate writes in merged regions
+        filled_cells: set[tuple[int, int]] = set()
+
         for entry_idx in range(1, min(data_count, available_rows) + 1):
             target_r_idx = data_start_r_idx + entry_idx - 1
             row = table.rows[target_r_idx]
             self._fill_row_by_column_map(
-                row, column_map, prefix, entry_idx, data
+                row, column_map, prefix, entry_idx, data, filled_cells
             )
 
     def _detect_column_mappings(
@@ -523,6 +572,7 @@ class FieldDetector:
         prefix: str,
         entry_idx: int,
         data: dict[str, str],
+        filled_cells: set[tuple[int, int]] | None = None,
     ) -> None:
         """Fill a single row based on the column mapping.
 
@@ -531,6 +581,9 @@ class FieldDetector:
         - "index" -> entry number
         - Other suffixes -> {prefix}_{idx}_{suffix}
         """
+        if filled_cells is None:
+            filled_cells = set()
+
         for c_idx, suffix in column_map.items():
             if c_idx >= len(row.cells):
                 continue
@@ -539,6 +592,11 @@ class FieldDetector:
 
             # Skip cells that already have content (don't overwrite)
             if cell.text.strip():
+                continue
+
+            # Skip cells we've already filled (merged cell dedup)
+            cell_id = (id(row), c_idx)
+            if cell_id in filled_cells:
                 continue
 
             if suffix == "date_range":
@@ -554,59 +612,101 @@ class FieldDetector:
 
             if value:
                 self._set_cell_text(cell, value)
+                filled_cells.add(cell_id)
 
     # ──────────────────── Phase 3: Single-Value Labels ────────────────────
 
     def _fill_single_value_labels(self, doc: Document, data: dict[str, str]) -> None:
-        """Smart-detect label cells and fill adjacent blanks (multi-direction)."""
+        """Smart-detect label cells and fill adjacent blanks (multi-direction).
+
+        Context-aware: when inside a "配偶" section, uses spouse-specific
+        field mappings instead of general ones.
+        """
         for table in doc.tables:
+            # Track which section context we're in
+            current_context: str = "personal"  # default
+            filled_cells: set[tuple[int, int]] = set()
+
             for r_idx, row in enumerate(table.rows):
                 cells = row.cells
+                row_text = " ".join(c.text.strip() for c in cells).strip()
+
+                # Check if this row is a section boundary
+                for pattern, ctx in self._boundary_compiled:
+                    if pattern.search(row_text):
+                        current_context = ctx
+                        break
+
                 for c_idx, cell in enumerate(cells):
                     text = cell.text.strip()
                     if not text:
                         continue
 
-                    for pattern, key in self._compiled:
+                    # Skip already filled cells
+                    cell_id = (id(row), c_idx)
+                    if cell_id in filled_cells:
+                        continue
+
+                    # Determine which mapping set to use
+                    if current_context == "spouse":
+                        mapping_set = self._spouse_compiled + self._compiled
+                    else:
+                        mapping_set = self._compiled
+
+                    for pattern, key in mapping_set:
                         if not pattern.search(text):
                             continue
 
+                        # For spouse context, skip if general mapping
+                        # already matched and spouse value is empty
                         value = data.get(key, "")
                         if not value:
                             continue
 
-                        # Skip if already filled (section filler may have done it)
-                        if value and value in cell.text:
+                        # Skip if cell already contains exactly this value
+                        # (avoid substring false positives like "无" in "有无既往病史")
+                        stripped_text = cell.text.strip()
+                        if (
+                            stripped_text.endswith(value)
+                            and len(stripped_text) <= len(value) + 5
+                        ):
                             break
 
                         # Strategy 1: Adjacent right cell
                         if c_idx + 1 < len(cells):
                             next_cell = cells[c_idx + 1]
-                            if not next_cell.text.strip():
+                            next_id = (id(row), c_idx + 1)
+                            if not next_cell.text.strip() and next_id not in filled_cells:
                                 self._set_cell_text(next_cell, value)
+                                filled_cells.add(next_id)
                                 break
 
                         # Strategy 2: Cell below (next row, same column)
                         if r_idx + 1 < len(table.rows):
-                            below_cell = table.rows[r_idx + 1].cells[c_idx]
-                            if not below_cell.text.strip():
+                            below_row = table.rows[r_idx + 1]
+                            below_cell = below_row.cells[c_idx]
+                            below_id = (id(below_row), c_idx)
+                            if (not below_cell.text.strip()
+                                    and below_id not in filled_cells):
                                 self._set_cell_text(below_cell, value)
+                                filled_cells.add(below_id)
                                 break
 
                         # Strategy 3: Same cell with "label:___" format
                         if text.endswith(":") or text.endswith("："):
                             new_text = text + " " + value
                             self._set_cell_text(cell, new_text)
+                            filled_cells.add(cell_id)
                             break
 
                         # Strategy 4: Same cell with "label：" + empty space
                         if "：" in text or ":" in text:
-                            # Replace trailing colons/underscores
                             new_text = re.sub(
                                 r"[:：]\s*$", f"：{value}", text
                             )
                             if new_text != text:
                                 self._set_cell_text(cell, new_text)
+                                filled_cells.add(cell_id)
                                 break
 
         # Also fill paragraph-based labels (label: value format)
@@ -619,8 +719,6 @@ class FieldDetector:
                     value = data.get(key, "")
                     if not value:
                         continue
-                    # Check if text is just the label (no value yet)
-                    # e.g., "姓名：" with nothing after
                     match = re.match(
                         r"^(.*?[:：])\s*$", text
                     )

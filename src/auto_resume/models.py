@@ -30,6 +30,7 @@ class Education:
     end_date: str = ""
     gpa: str = ""
     description: str = ""
+    research_direction: str = ""   # 研究方向
     education_level: str = ""      # 学习层次 (本科/硕士/博士)
     education_form: str = ""       # 办学形式 (全日制/非全日制/成人/网络教育)
     reference_person: str = ""     # 证明人
@@ -39,6 +40,8 @@ class Education:
         parts = [f"{self.school} | {self.major} | {self.degree}"]
         if self.start_date or self.end_date:
             parts.append(f"{self.start_date} - {self.end_date}")
+        if self.research_direction:
+            parts.append(f"方向: {self.research_direction}")
         if self.education_level:
             parts.append(self.education_level)
         if self.education_form:
@@ -230,6 +233,15 @@ class ResumeData:
     spouse_birth_date: str = ""
     spouse_work_unit: str = ""
     spouse_phone: str = ""
+    spouse_hometown: str = ""             # 配偶籍贯
+    spouse_education: str = ""           # 配偶学历/学位
+    spouse_professional_title: str = ""  # 配偶职称
+
+    # ── Additional form fields ──
+    highest_degree: str = ""            # 最高学位
+    medical_history: str = ""           # 既往病史
+    research_achievements: str = ""     # 主要科研成果
+    remarks: str = ""                   # 备注
 
     # ── Lists (multi-entry) ──
     education: list[Education] = field(default_factory=list)
@@ -266,7 +278,11 @@ class ResumeData:
             "self_evaluation",
             # Spouse
             "spouse_name", "spouse_birth_date", "spouse_work_unit",
-            "spouse_phone",
+            "spouse_phone", "spouse_hometown", "spouse_education",
+            "spouse_professional_title",
+            # Additional form fields
+            "highest_degree", "medical_history", "research_achievements",
+            "remarks",
         ]
         for f in simple_fields:
             if f in data:
@@ -325,8 +341,12 @@ class ResumeData:
             "expected_salary", "expected_city", "availability",
             "self_evaluation",
             "spouse_name", "spouse_birth_date", "spouse_work_unit",
-            "spouse_phone",
+            "spouse_phone", "spouse_hometown", "spouse_education",
+            "spouse_professional_title",
+            "highest_degree", "medical_history", "research_achievements",
+            "remarks",
         ]
+
         for f in simple_fields:
             d[f] = getattr(self, f) or ""
 
@@ -341,6 +361,7 @@ class ResumeData:
             d[f"education_{i}_end_date"] = edu.end_date
             d[f"education_{i}_gpa"] = edu.gpa
             d[f"education_{i}_description"] = edu.description
+            d[f"education_{i}_research_direction"] = edu.research_direction
             d[f"education_{i}_education_level"] = edu.education_level
             d[f"education_{i}_education_form"] = edu.education_form
             d[f"education_{i}_reference_person"] = edu.reference_person
