@@ -1,17 +1,14 @@
 """Tests for auto_resume package."""
 
 import json
-import tempfile
-from pathlib import Path
 
 import pytest
 from docx import Document
 
-from auto_resume.models import ResumeData, Education, WorkExperience
-from auto_resume.engine import TemplateEngine
 from auto_resume.detector import FieldDetector
+from auto_resume.engine import TemplateEngine
+from auto_resume.models import Education, ResumeData
 from auto_resume.template_generator import generate_all_templates
-
 
 # ──────────────────── Fixtures ────────────────────
 
@@ -172,7 +169,7 @@ class TestTemplateEngine:
         """Test filling {{placeholder}} style template."""
         doc = Document()
         p = doc.add_paragraph()
-        run = p.add_run("姓名：{{name}}，电话：{{phone}}")
+        p.add_run("姓名：{{name}}，电话：{{phone}}")
 
         template_path = tmp_path / "test_template.docx"
         doc.save(str(template_path))
@@ -263,8 +260,8 @@ class TestFieldDetector:
 
         assert len(previews) > 0
         labels = [p["label"] for p in previews]
-        assert any("姓名" in l for l in labels)
-        assert any("性别" in l for l in labels)
+        assert any("姓名" in label for label in labels)
+        assert any("性别" in label for label in labels)
 
     def test_auto_fill_table_template(self, sample_resume, generated_templates):
         """Test auto-filling a table template (smart mode)."""

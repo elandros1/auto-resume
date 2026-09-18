@@ -8,10 +8,8 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
-from typing import Any
 
 from docx import Document
-
 
 # Mapping from Chinese field labels (regex patterns) to resume keys
 FIELD_MAPPINGS: list[tuple[str, str]] = [

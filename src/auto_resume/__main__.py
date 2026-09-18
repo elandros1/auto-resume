@@ -7,13 +7,12 @@ from pathlib import Path
 
 import click
 from rich.console import Console
-from rich.table import Table as RichTable
-from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, TextColumn
+from rich.table import Table as RichTable
 
-from .models import ResumeData
-from .engine import TemplateEngine
 from .detector import FieldDetector
+from .engine import TemplateEngine
+from .models import ResumeData
 from .template_generator import generate_all_templates
 
 console = Console()
@@ -144,7 +143,10 @@ def fill(resume_path, template_path, templates_dir, output_dir, smart):
             summary.add_row(name, path.name if path else "-", status)
 
         console.print(summary)
-        console.print(f"\n[bold green]完成！共 {len(results)} 个文件已生成到 {output_dir}/[/bold green]")
+        count = len(results)
+        console.print(
+            f"\n[bold green]完成！共 {count} 个文件已生成到 {output_dir}/[/bold green]"
+        )
 
 
 @cli.command()
@@ -172,7 +174,7 @@ def preview(resume_path, template_path):
 
     if not previews:
         console.print("[yellow]未检测到可自动识别的字段[/yellow]")
-        console.print("[dim]提示: 确保模板中使用中文标签（如"姓名"、"电话"等）[/dim]")
+        console.print('[dim]提示: 确保模板中使用中文标签（如姓名、电话等）[/dim]')
         return
 
     table = RichTable(title=f"智能识别结果 — {Path(template_path).name}")

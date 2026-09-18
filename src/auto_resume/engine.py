@@ -4,10 +4,9 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
-from typing import Any
 
 from docx import Document
-from docx.oxml.ns import qn
+from docx.shared import Inches
 from docx.text.paragraph import Paragraph
 
 from .models import ResumeData
@@ -133,7 +132,7 @@ class TemplateEngine:
                     run.text = ""
                 # Add picture
                 run = paragraph.add_run()
-                run.add_picture(str(photo_path), width=docx.shared.Inches(1.5))
+                run.add_picture(str(photo_path), width=Inches(1.5))
                 return
 
     def fill_all(

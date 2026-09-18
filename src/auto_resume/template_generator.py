@@ -5,10 +5,10 @@ from __future__ import annotations
 from pathlib import Path
 
 from docx import Document
-from docx.shared import Inches, Pt, Cm
-from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.enum.table import WD_TABLE_ALIGNMENT
+from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml.ns import qn
+from docx.shared import Pt
 
 
 def set_cell_font(cell, name="宋体", size=10.5, bold=False):
