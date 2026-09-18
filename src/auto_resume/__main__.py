@@ -255,24 +255,47 @@ def new_resume(output_path):
     import json
 
     template = {
+        # Basic info
         "name": "",
         "gender": "",
         "birth_date": "",
+        "age": "",
         "phone": "",
         "email": "",
         "address": "",
+        "postal_code": "",
         "hometown": "",
+        "hukou_location": "",
         "political_status": "",
         "id_number": "",
         "nationality": "",
         "marital_status": "",
+        "height": "",
+        "vision": "",
         "photo_path": "",
+        # Professional info
+        "specialty": "",
+        "computer_proficiency": "",
+        "foreign_language": "",
+        "previous_employer": "",
+        "current_position": "",
+        "professional_title": "",
+        "social_experience": "",
+        # Job seeking
         "job_intent": "",
+        "applied_position": "",
         "expected_position": "",
         "expected_salary": "",
         "expected_city": "",
         "availability": "",
+        # Self evaluation
         "self_evaluation": "",
+        # Spouse
+        "spouse_name": "",
+        "spouse_birth_date": "",
+        "spouse_work_unit": "",
+        "spouse_phone": "",
+        # Education
         "education": [
             {
                 "school": "",
@@ -281,9 +304,14 @@ def new_resume(output_path):
                 "start_date": "",
                 "end_date": "",
                 "gpa": "",
-                "description": ""
+                "description": "",
+                "education_level": "",
+                "education_form": "",
+                "reference_person": "",
+                "reference_phone": ""
             }
         ],
+        # Work experience
         "work_experience": [
             {
                 "company": "",
@@ -291,9 +319,13 @@ def new_resume(output_path):
                 "start_date": "",
                 "end_date": "",
                 "department": "",
-                "description": ""
+                "description": "",
+                "reference_person": "",
+                "reference_phone": "",
+                "professional_title": ""
             }
         ],
+        # Projects
         "projects": [
             {
                 "name": "",
@@ -301,9 +333,45 @@ def new_resume(output_path):
                 "start_date": "",
                 "end_date": "",
                 "description": "",
-                "technologies": ""
+                "technologies": "",
+                "funding_source": "",
+                "funding_amount": ""
             }
         ],
+        # Publications
+        "publications": [
+            {
+                "title": "",
+                "journal": "",
+                "date": "",
+                "authors": "",
+                "index": ""
+            }
+        ],
+        # Awards
+        "awards": [
+            {
+                "date": "",
+                "title": "",
+                "level": "",
+                "issuer": ""
+            }
+        ],
+        # Family members
+        "family_members": [
+            {
+                "name": "",
+                "relationship": "",
+                "gender": "",
+                "birth_date": "",
+                "phone": "",
+                "work_unit": "",
+                "position": "",
+                "address": "",
+                "political_status": ""
+            }
+        ],
+        # Skills
         "skills": [
             {"category": "", "items": ""}
         ],

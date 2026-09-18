@@ -2,23 +2,42 @@
   "name": "张三",
   "gender": "男",
   "birth_date": "1995-06",
+  "age": "29",
   "phone": "13800138000",
   "email": "zhangsan@example.com",
   "address": "北京市海淀区中关村大街1号",
+  "postal_code": "100080",
   "hometown": "浙江杭州",
+  "hukou_location": "浙江省杭州市",
   "political_status": "中共党员",
   "id_number": "3301**********1234",
   "nationality": "汉",
   "marital_status": "未婚",
+  "height": "175cm",
+  "vision": "5.0/5.0",
   "photo_path": "",
 
+  "specialty": "人工智能与机器学习，擅长自然语言处理和大模型训练",
+  "computer_proficiency": "熟练使用Python、Java、C++，精通PyTorch、TensorFlow框架",
+  "foreign_language": "英语（CET-6，流利，可作为工作语言）；日语（日常会话）",
+  "previous_employer": "清华大学计算机系",
+  "current_position": "助理研究员",
+  "professional_title": "助理研究员（中级职称）",
+  "social_experience": "2020-2021年担任研究生会学术部部长，组织学术论坛5场",
+
   "job_intent": "高校教师",
+  "applied_position": "计算机科学与技术 讲师/副教授",
   "expected_position": "计算机科学与技术 讲师/副教授",
   "expected_salary": "面议",
   "expected_city": "北京",
   "availability": "随时到岗",
 
   "self_evaluation": "博士毕业于985高校，发表SCI论文5篇，主持省级科研项目1项，具备扎实的科研能力和教学经验。",
+
+  "spouse_name": "",
+  "spouse_birth_date": "",
+  "spouse_work_unit": "",
+  "spouse_phone": "",
 
   "education": [
     {
@@ -28,7 +47,11 @@
       "start_date": "2019.09",
       "end_date": "2024.06",
       "gpa": "3.8/4.0",
-      "description": "研究方向：人工智能与机器学习"
+      "description": "研究方向：人工智能与机器学习",
+      "education_level": "博士研究生",
+      "education_form": "全日制",
+      "reference_person": "李教授",
+      "reference_phone": "0571-12345678"
     },
     {
       "school": "浙江大学",
@@ -37,7 +60,11 @@
       "start_date": "2015.09",
       "end_date": "2019.06",
       "gpa": "3.9/4.0",
-      "description": ""
+      "description": "",
+      "education_level": "本科",
+      "education_form": "全日制",
+      "reference_person": "王教授",
+      "reference_phone": "0571-87654321"
     }
   ],
 
@@ -48,7 +75,10 @@
       "start_date": "2024.07",
       "end_date": "至今",
       "department": "人工智能研究所",
-      "description": "从事大模型训练优化研究，指导硕士研究生3名，承担《机器学习》课程教学工作。"
+      "description": "从事大模型训练优化研究，指导硕士研究生3名，承担《机器学习》课程教学工作。",
+      "reference_person": "张院士",
+      "reference_phone": "010-12345678",
+      "professional_title": "助理研究员"
     },
     {
       "company": "阿里巴巴达摩院",
@@ -56,7 +86,10 @@
       "start_date": "2022.06",
       "end_date": "2022.12",
       "department": "自然语言处理团队",
-      "description": "参与预训练语言模型研发，负责数据清洗和模型微调模块。"
+      "description": "参与预训练语言模型研发，负责数据清洗和模型微调模块。",
+      "reference_person": "陈研究员",
+      "reference_phone": "0571-98765432",
+      "professional_title": ""
     }
   ],
 
@@ -67,7 +100,66 @@
       "start_date": "2023.01",
       "end_date": "2023.12",
       "description": "利用LLM自动提取实体关系，构建领域知识图谱，准确率达92%。",
-      "technologies": "Python, PyTorch, Transformers, Neo4j"
+      "technologies": "Python, PyTorch, Transformers, Neo4j",
+      "funding_source": "省级科研基金",
+      "funding_amount": "30万元"
+    }
+  ],
+
+  "publications": [
+    {
+      "title": "Efficient Training of Large Language Models on Limited GPU Resources",
+      "journal": "ACL 2023",
+      "date": "2023.07",
+      "authors": "第一作者",
+      "index": "CCF-A"
+    },
+    {
+      "title": "知识图谱增强的预训练语言模型研究",
+      "journal": "计算机学报",
+      "date": "2023.03",
+      "authors": "第一作者",
+      "index": "EI"
+    }
+  ],
+
+  "awards": [
+    {
+      "date": "2023.10",
+      "title": "优秀博士论文",
+      "level": "校级",
+      "issuer": "浙江大学"
+    },
+    {
+      "date": "2021.05",
+      "title": "国家奖学金",
+      "level": "国家级",
+      "issuer": "教育部"
+    }
+  ],
+
+  "family_members": [
+    {
+      "name": "张父",
+      "relationship": "父亲",
+      "gender": "男",
+      "birth_date": "1965.03",
+      "phone": "13900001111",
+      "work_unit": "杭州某中学",
+      "position": "教师",
+      "address": "浙江省杭州市西湖区",
+      "political_status": "中共党员"
+    },
+    {
+      "name": "李母",
+      "relationship": "母亲",
+      "gender": "女",
+      "birth_date": "1968.08",
+      "phone": "13900002222",
+      "work_unit": "杭州某医院",
+      "position": "护士",
+      "address": "浙江省杭州市西湖区",
+      "political_status": "群众"
     }
   ],
 

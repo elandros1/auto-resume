@@ -23,27 +23,50 @@ from docx.text.paragraph import Paragraph
 
 # Single-value field mappings: (regex_pattern, resume_key)
 FIELD_MAPPINGS: list[tuple[str, str]] = [
-    # Basic info
+    # ── Basic personal info ──
     (r"姓\s*名", "name"),
     (r"性\s*别", "gender"),
     (r"出生年月|出生日期|生日", "birth_date"),
+    (r"年\s*龄", "age"),
     (r"联系电话|手机|电话", "phone"),
     (r"电子邮箱|邮箱|Email|E-mail|电子邮件", "email"),
     (r"籍\s*贯", "hometown"),
     (r"政治面貌", "political_status"),
-    (r"身份证号|证件号码", "id_number"),
+    (r"身份证号|证件号码|身份证号码", "id_number"),
     (r"民\s*族", "nationality"),
-    (r"婚姻状况", "marital_status"),
+    (r"婚姻状况|是否已婚|婚否", "marital_status"),
     (r"通讯地址|联系地址|地址", "address"),
+    (r"邮\s*编|邮政编码", "postal_code"),
+    (r"户口所在地|户籍地|户口", "hukou_location"),
+    (r"身\s*高", "height"),
+    (r"视\s*力", "vision"),
     (r"照片|相片", "photo_path"),
-    # Job intent
-    (r"求职意向|应聘岗位|期望岗位|意向岗位", "expected_position"),
+    # ── Professional info ──
+    (r"专业特长|特长", "specialty"),
+    (r"计算机熟练程度|计算机水平|计算机能力", "computer_proficiency"),
+    (r"外语熟练程度|外语水平|外语能力|外语程度", "foreign_language"),
+    (r"原单位|原工作单位", "previous_employer"),
+    (r"从事的岗位|现任岗位|现任职务", "current_position"),
+    (r"职\s*称", "professional_title"),
+    (r"社会经历|社会实践", "social_experience"),
+    (r"所学专业", "education_1_major"),
+    (r"学\s*历", "education_1_degree"),
+    (r"学\s*位", "education_1_degree"),
+    # ── Job seeking ──
+    (r"求职意向|意向岗位", "expected_position"),
+    (r"应聘岗位|应聘的岗位|应聘岗位", "applied_position"),
+    (r"期望岗位|期望职位", "expected_position"),
     (r"期望薪资|期望薪酬|薪资要求", "expected_salary"),
     (r"期望城市|意向城市|期望工作地点", "expected_city"),
     (r"到岗时间|可入职时间", "availability"),
-    # Self evaluation
+    # ── Self evaluation ──
     (r"自我评价|自我介绍|个人简介", "self_evaluation"),
-    # Summary fields (for paragraph-style templates)
+    # ── Spouse info ──
+    (r"配偶姓名|爱人姓名", "spouse_name"),
+    (r"配偶出生年月|配偶生日", "spouse_birth_date"),
+    (r"配偶工作单位|配偶单位", "spouse_work_unit"),
+    (r"配偶电话", "spouse_phone"),
+    # ── Summary fields (for paragraph-style templates) ──
     (r"毕业院校|学校名称|院校", "education_summary"),
     (r"专业技能|技能特长|技能", "skills_summary"),
     (r"证书|资格证书|职业证书", "certificates_summary"),
@@ -57,48 +80,76 @@ FIELD_MAPPINGS: list[tuple[str, str]] = [
 SECTION_PATTERNS: dict[str, str] = {
     r"教育经历|学习经历|教育背景|学历背景": "education",
     r"工作经历|工作经验|工作背景|职业经历": "work",
-    r"项目经验|项目经历|科研项目": "project",
-    r"发表论文|论文列表|学术成果": "publication",
+    r"项目经验|项目经历|科研项目|主持的主要科研项目": "project",
+    r"发表论文|论文列表|学术成果|发表的论文": "publication",
     r"获奖情况|荣誉奖项|获奖经历": "award",
+    r"家庭成员|家庭情况|主要社会关系|家庭关系": "family",
+    r"社会经历|社会实践": "social",
 }
 
 # Column header patterns: map column header text to field suffix
-# For education section: "起止时间" -> combine start_date and end_date
 COLUMN_MAPPINGS: dict[str, dict[str, str]] = {
     "education": {
         r"起止时间|时间|起讫时间|在校时间": "date_range",
         r"院校名称|学校名称|院校|毕业院校|学校": "school",
         r"专\s*业": "major",
-        r"学\s*历|学位": "degree",
+        r"学\s*历": "degree",
+        r"学\s*位": "degree",
+        r"学习层次|层次": "education_level",
+        r"办学形式|培养方式": "education_form",
+        r"证明人": "reference_person",
+        r"证明人电话|证明人电话|联系电话": "reference_phone",
         r"GPA|成绩": "gpa",
         r"备注|说明|描述": "description",
     },
     "work": {
         r"起止时间|时间|起讫时间|工作时间": "date_range",
-        r"工作单位|单位名称|单位|公司": "company",
-        r"职\s*位|职务|岗位": "position",
+        r"工作单位|单位名称|单位|公司|任何单位": "company",
+        r"职\s*位|职务|岗位|担任的职务": "position",
+        r"职称|专业技术职务": "professional_title",
         r"部门|院系": "department",
+        r"证明人": "reference_person",
+        r"证明人电话|联系电话": "reference_phone",
         r"工作内容|职责|描述|备注": "description",
     },
     "project": {
         r"起止时间|时间|项目时间": "date_range",
         r"项目名称|名称": "name",
-        r"角\s*色|职务|承担工作": "role",
+        r"角\s*色|职务|承担工作|主持|参与": "role",
         r"技术|技术栈|使用技术": "technologies",
+        r"经费来源|来源": "funding_source",
+        r"经费|金额|经费金额": "funding_amount",
         r"描述|内容|备注": "description",
     },
     "publication": {
         r"序号|编号": "index",
         r"论文题目|题目|名称": "title",
-        r"期刊|发表刊物|杂志": "journal",
+        r"期刊|发表刊物|杂志|发表期刊": "journal",
         r"时间|日期|发表时间": "date",
-        r"作者|作者顺序": "authors",
+        r"作者|作者顺序|署名": "authors",
+        r"收录|收录情况|SCI|EI|索引": "index",
     },
     "award": {
         r"时间|日期|获奖时间": "date",
         r"奖项名称|名称|获奖": "title",
         r"级别|等级": "level",
         r"颁发单位|授予单位": "issuer",
+    },
+    "family": {
+        r"姓名|称谓": "name",
+        r"关系|与本人关系": "relationship",
+        r"性\s*别": "gender",
+        r"出生年月|出生日期|年龄": "birth_date",
+        r"电话|联系电话|手机": "phone",
+        r"工作单位|单位": "work_unit",
+        r"职务|岗位": "position",
+        r"地址": "address",
+        r"政治面貌": "political_status",
+    },
+    "social": {
+        r"起止时间|时间": "date_range",
+        r"内容|经历|描述": "description",
+        r"地点|单位": "location",
     },
 }
 
@@ -399,11 +450,17 @@ class FieldDetector:
             return
 
         # Determine how many entries to fill
-        # Handle inconsistent count key naming: work_experience_count vs work_count
+        # Handle inconsistent count key naming across sections
         count_key = f"{prefix}_count"
         if prefix == "work":
             count_key = "work_experience_count"
-        data_count = int(data.get(count_key, "0"))
+        elif prefix == "family":
+            count_key = "family_members_count"
+        elif prefix == "social":
+            # Social experience is a single string field, not a list
+            data_count = 1
+            count_key = ""
+        data_count = int(data.get(count_key, "0")) if count_key else data_count
         if data_count == 0:
             return
 
@@ -471,6 +528,7 @@ class FieldDetector:
 
         For each column, look up the corresponding field value:
         - "date_range" -> combine {prefix}_{idx}_start_date and _end_date
+        - "index" -> entry number
         - Other suffixes -> {prefix}_{idx}_{suffix}
         """
         for c_idx, suffix in column_map.items():
@@ -489,6 +547,8 @@ class FieldDetector:
                 value = f"{start} - {end}" if start and end else f"{start}{end}"
             elif suffix == "index":
                 value = str(entry_idx)
+            elif prefix == "social":
+                value = data.get("social_experience", "")
             else:
                 value = data.get(f"{prefix}_{entry_idx}_{suffix}", "")
 
