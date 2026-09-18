@@ -303,14 +303,30 @@ class FieldDetector:
         ]
         # Fuzzy matcher for auto-recognizing unknown field variants
         self._fuzzy = FuzzyMatcher()
+        # AI mapper (optional, used when --ai mode is enabled)
+        self._ai_mapping: dict[str, str] | None = None
+
+    def enable_ai(self, ai_mapping: dict[str, str]) -> None:
+        """Enable AI-powered field mapping.
+
+        Pass a {label: key} dict from AIFieldMapper.map_fields().
+        When enabled, AI mapping is checked first (Layer 0),
+        before regex/fuzzy/semantic layers.
+        """
+        self._ai_mapping = ai_mapping
+
+    def disable_ai(self) -> None:
+        """Disable AI mapping, fall back to regex/fuzzy/semantic."""
+        self._ai_mapping = None
 
     # ──────────────────── Public API ────────────────────
 
     def _match_label(
         self, text: str, context: str = "personal"
     ) -> tuple[str | None, float, str]:
-        """Match a label to a resume key using three layers.
+        """Match a label to a resume key using four layers.
 
+        Layer 0: AI mapping (if enabled) — universal, handles anything
         Layer 1: Regex patterns (FIELD_MAPPINGS or context overrides)
         Layer 2: Fuzzy similarity matching (auto-recognizes variants)
         Layer 3: Semantic keyword matching (catches new wordings)
@@ -325,6 +341,19 @@ class FieldDetector:
         text = text.strip()
         if not text:
             return None, 0.0, "none"
+
+        # Layer 0: AI mapping (highest priority, universal)
+        if self._ai_mapping:
+            # Try exact match
+            if text in self._ai_mapping:
+                key = self._ai_mapping[text]
+                if key and not key.startswith("section:"):
+                    return key, 1.0, "ai"
+            # Try fuzzy match against AI mapping keys
+            for ai_label, key in self._ai_mapping.items():
+                if text == ai_label or ai_label in text or text in ai_label:
+                    if key and not key.startswith("section:"):
+                        return key, 0.95, "ai"
 
         # Layer 1: Regex (with context overrides)
         mapping_set: list[tuple[re.Pattern, str]]

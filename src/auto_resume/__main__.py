@@ -11,6 +11,7 @@ from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.table import Table as RichTable
 
 from . import get_resource_path
+from .ai_mapper import AIFieldMapper
 from .detector import FieldDetector
 from .engine import TemplateEngine
 from .models import ResumeData
@@ -61,8 +62,47 @@ def cli():
     default=True,
     help="启用智能识别模式（自动检测中文标签填充）",
 )
-def fill(resume_path, template_path, templates_dir, output_dir, smart):
-    """填充模板：用简历数据自动填写 Word 文档"""
+@click.option(
+    "--ai/--no-ai",
+    default=False,
+    help="启用AI模式：用大模型自动映射字段（需配置AI_API_KEY）",
+)
+@click.option(
+    "--ai-key",
+    "ai_api_key",
+    default=None,
+    help="AI API密钥（也可通过环境变量AI_API_KEY设置）",
+)
+@click.option(
+    "--ai-model",
+    "ai_model",
+    default="deepseek-chat",
+    help="AI模型名称（默认: deepseek-chat）",
+)
+@click.option(
+    "--ai-base-url",
+    "ai_base_url",
+    default="https://api.deepseek.com/v1",
+    help="AI API地址（默认: DeepSeek）",
+)
+def fill(
+    resume_path,
+    template_path,
+    templates_dir,
+    output_dir,
+    smart,
+    ai,
+    ai_api_key,
+    ai_model,
+    ai_base_url,
+):
+    """填充模板：用简历数据自动填写 Word 文档
+
+    三种模式：
+    1. --ai     AI模式：用大模型自动映射，适配任何高校模板（终极方案）
+    2. --smart  智能模式：正则+模糊匹配+语义关键词（默认）
+    3. --no-smart 基础模式：仅替换占位符
+    """
     resume = ResumeData.from_json(resume_path)
 
     if not templates_dir and not template_path:
@@ -81,7 +121,52 @@ def fill(resume_path, template_path, templates_dir, output_dir, smart):
         out_name = f"{resume.name}_{template_path.stem}_filled.docx"
         out_path = output_dir / out_name
 
-        if smart:
+        if ai:
+            # AI mode: use LLM to map fields universally
+            ai_mapper = AIFieldMapper(
+                api_key=ai_api_key,
+                model=ai_model,
+                base_url=ai_base_url,
+            )
+            if not ai_mapper.is_available():
+                console.print("[red]错误: 未配置AI API密钥[/red]")
+                console.print("[dim]请通过 --ai-key 参数或 AI_API_KEY 环境变量设置[/dim]")
+                sys.exit(1)
+
+            console.print(f"[cyan]AI模式: 使用 {ai_model} 自动映射字段...[/cyan]")
+            console.print("[dim]  (只发送字段标签，不发送个人数据)[/dim]")
+
+            with Progress(
+                SpinnerColumn(),
+                TextColumn("[progress.description]{task.description}"),
+                console=console,
+            ) as progress:
+                task = progress.add_task("AI分析模板字段...", total=None)
+                flat_data = resume.to_flat_dict()
+                resume_keys = list(flat_data.keys())
+                ai_mapping = ai_mapper.map_fields(template_path, resume_keys)
+                progress.update(task, completed=True)
+
+            console.print(f"[green]✓ AI识别到 {len(ai_mapping)} 个字段映射[/green]")
+
+            detector = FieldDetector()
+            detector.enable_ai(ai_mapping)
+
+            with Progress(
+                SpinnerColumn(),
+                TextColumn("[progress.description]{task.description}"),
+                console=console,
+            ) as progress:
+                task = progress.add_task(f"AI填充 {template_path.name}...", total=None)
+                result = detector.auto_fill(template_path, flat_data, out_path)
+                progress.update(task, completed=True)
+
+            console.print(f"\n[green]✓ 已生成: {result}[/green]")
+            console.print(f"  [dim]模板: {template_path}[/dim]")
+            console.print(f"  [dim]数据: {resume_path}[/dim]")
+            console.print(f"  [dim]模式: AI ({ai_model})[/dim]")
+
+        elif smart:
             detector = FieldDetector()
             data = resume.to_flat_dict()
             with Progress(
@@ -114,15 +199,39 @@ def fill(resume_path, template_path, templates_dir, output_dir, smart):
         console.print(f"[cyan]找到 {len(templates)} 个模板，开始批量填充...[/cyan]\n")
 
         results = []
-        detector = FieldDetector() if smart else None
-        data = resume.to_flat_dict() if smart else None
+        detector = None
+        ai_mapper = None
+        data = None
+
+        if ai:
+            ai_mapper = AIFieldMapper(
+                api_key=ai_api_key,
+                model=ai_model,
+                base_url=ai_base_url,
+            )
+            if not ai_mapper.is_available():
+                console.print("[red]错误: 未配置AI API密钥[/red]")
+                sys.exit(1)
+            detector = FieldDetector()
+            data = resume.to_flat_dict()
+            console.print(f"[cyan]AI模式: 使用 {ai_model}[/cyan]")
+        elif smart:
+            detector = FieldDetector()
+            data = resume.to_flat_dict()
 
         for template in templates:
             out_name = f"{resume.name}_{template.stem}_filled.docx"
             out_path = output_dir / out_name
 
             try:
-                if smart:
+                if ai:
+                    # AI mode: map each template individually
+                    ai_mapping = ai_mapper.map_fields(
+                        template, list(data.keys())
+                    )
+                    detector.enable_ai(ai_mapping)
+                    detector.auto_fill(template, data, out_path)
+                elif smart:
                     detector.auto_fill(template, data, out_path)
                 else:
                     engine = TemplateEngine(resume)
@@ -165,12 +274,36 @@ def fill(resume_path, template_path, templates_dir, output_dir, smart):
     type=click.Path(exists=True),
     help="要预览的 Word 模板路径",
 )
-def preview(resume_path, template_path):
+@click.option(
+    "--ai/--no-ai",
+    default=False,
+    help="使用AI模式预览（需配置AI_API_KEY）",
+)
+@click.option(
+    "--ai-key",
+    "ai_api_key",
+    default=None,
+    help="AI API密钥",
+)
+def preview(resume_path, template_path, ai, ai_api_key):
     """预览：查看模板中哪些字段会被自动识别和填充"""
 
     resume = ResumeData.from_json(resume_path)
     data = resume.to_flat_dict()
     detector = FieldDetector()
+
+    if ai:
+        ai_mapper = AIFieldMapper(api_key=ai_api_key)
+        if not ai_mapper.is_available():
+            console.print("[red]错误: 未配置AI API密钥[/red]")
+            sys.exit(1)
+        console.print("[cyan]AI模式: 正在分析模板字段...[/cyan]")
+        ai_mapping = ai_mapper.map_fields(
+            template_path, list(data.keys())
+        )
+        detector.enable_ai(ai_mapping)
+        console.print(f"[green]✓ AI映射了 {len(ai_mapping)} 个字段[/green]\n")
+
     previews = detector.preview_mapping(template_path)
 
     if not previews:
@@ -183,13 +316,18 @@ def preview(resume_path, template_path):
     table.add_column("模板中的标签", style="cyan")
     table.add_column("映射到字段", style="yellow")
     table.add_column("当前值", style="green")
+    table.add_column("方法", style="magenta")
     table.add_column("位置", style="dim")
 
     for i, p in enumerate(previews, 1):
         value = data.get(p["resume_key"], "")
         if len(value) > 30:
             value = value[:30] + "..."
-        table.add_row(str(i), p["label"], p["resume_key"], value or "[空]", p["location"])
+        method = p.get("method", "")
+        table.add_row(
+            str(i), p["label"], p["resume_key"],
+            value or "[空]", method, p["location"]
+        )
 
     console.print(table)
     console.print(f"\n[bold]共识别 {len(previews)} 个字段[/bold]")
